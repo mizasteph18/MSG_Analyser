@@ -1,0 +1,3436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MSG Analyser</title>
+    <style>
+        :root {
+            --primary-color: #00a678;
+            --primary-dark: #009c6d;
+            --primary-light: #8dc9ab;
+            --primary-darker: #007348;
+            --primary-medium: #00925b;
+            --secondary-color: #f3f2f1;
+            --danger-color: #d13438;
+            --warning-color: #ffaa44;
+            --success-color: #107c10;
+            --border-color: #d1d1d1;
+            --text-color: #323130;
+            --light-text: #605e5c;
+            --sidebar-width: 320px;
+            --outlook-color: #0078d4;
+            --outlook-dark: #106ebe;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #faf9f8;
+            color: var(--text-color);
+            line-height: 1.6;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        
+        .app-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .app-title h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .message-counter {
+            font-weight: 500;
+            color: white;
+        }
+        
+        .refresh-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 4px;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: white;
+        }
+        
+        .refresh-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: rotate(90deg);
+        }
+        
+        .refresh-btn:active {
+            transform: rotate(180deg);
+        }
+        
+        .refresh-btn.loading {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: white;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .folder-selector {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .folder-selector select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .filter-options {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .filter-options h3 {
+            margin-bottom: 15px;
+            font-size: 1rem;
+            color: var(--light-text);
+        }
+        
+        .status-filters {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .status-filter {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .view-options {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .view-options h3 {
+            margin-bottom: 10px;
+            font-size: 1rem;
+            color: var(--light-text);
+        }
+        
+        .view-toggle {
+            display: flex;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .view-option {
+            flex: 1;
+            padding: 8px 12px;
+            text-align: center;
+            background: white;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background-color 0.2s;
+        }
+        
+        .view-option.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .conversation-list, .message-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 0;
+        }
+        
+        .conversation-item {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .conversation-item:hover {
+            background-color: var(--secondary-color);
+        }
+        
+        .conversation-item.active {
+            background-color: #e1f5fe;
+            border-left: 3px solid var(--primary-color);
+        }
+        
+        .conversation-subject {
+            font-weight: 600;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .conversation-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--light-text);
+            margin-top: 5px;
+        }
+        
+        .message-count {
+            background: var(--primary-color);
+            color: white;
+            border-radius: 10px;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+        }
+        
+        .message-item {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .message-item:hover {
+            background-color: var(--secondary-color);
+        }
+        
+        .message-item.active {
+            background-color: #e1f5fe;
+            border-left: 3px solid var(--primary-color);
+        }
+        
+        .message-subject {
+            font-weight: 600;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .message-preview {
+            font-size: 0.85rem;
+            color: var(--light-text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .message-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--light-text);
+            margin-top: 5px;
+        }
+        
+        .content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .message-header {
+            padding: 20px 30px;
+            background-color: white;
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        .message-subject-large {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .message-meta-large {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 0.9rem;
+            color: var(--light-text);
+        }
+        
+        .message-meta-row {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .message-content {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            background-color: white;
+            margin: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .conversation-view {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .conversation-message {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .conversation-message.active {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(0, 166, 120, 0.2);
+        }
+        
+        .message-header-small {
+            padding: 15px;
+            background-color: #f8f8f8;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+        }
+        
+        .message-header-small:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .message-subject-small {
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 1rem;
+        }
+        
+        .message-meta-small {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            font-size: 0.85rem;
+            color: var(--light-text);
+        }
+        
+        .message-body-small {
+            padding: 15px;
+            white-space: pre-wrap;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+        
+        .single-message-view .message-body {
+            white-space: pre-wrap;
+            line-height: 1.6;
+            font-size: 15px;
+        }
+        
+        .message-actions {
+            padding: 20px 30px;
+            background-color: white;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .nav-buttons button {
+            padding: 8px 16px;
+            border: 1px solid var(--border-color);
+            background-color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        
+        .nav-buttons button:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .action-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            color: white;
+            transition: background-color 0.2s;
+            min-width: 100px;
+        }
+        
+        .delete-btn {
+            background-color: var(--danger-color);
+        }
+        
+        .delete-btn:hover {
+            background-color: #a4262c;
+        }
+        
+        .keep-btn {
+            background-color: var(--success-color);
+        }
+        
+        .keep-btn:hover {
+            background-color: #0e6b0e;
+        }
+        
+        .review-btn {
+            background-color: var(--warning-color);
+        }
+        
+        .review-btn:hover {
+            background-color: #e69500;
+        }
+        
+        .comment-btn {
+            background-color: var(--primary-color);
+        }
+        
+        .comment-btn:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        .copy-btn {
+            background-color: var(--primary-medium);
+        }
+        
+        .copy-btn:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        .outlook-btn {
+            background-color: var(--outlook-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 15px;
+        }
+        
+        .outlook-btn:hover {
+            background-color: var(--outlook-dark);
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        .status-keep {
+            background-color: #dff6dd;
+            color: #107c10;
+        }
+        
+        .status-review {
+            background-color: #fff4ce;
+            color: #8a6e00;
+        }
+        
+        .status-untagged {
+            background-color: #f4f4f4;
+            color: #605e5c;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background-color: white;
+            padding: 25px;
+            border-radius: 8px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal h3 {
+            margin-bottom: 15px;
+            color: var(--primary-color);
+        }
+        
+        .modal p {
+            margin-bottom: 20px;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .modal-buttons button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        
+        .cancel-btn {
+            background-color: var(--secondary-color);
+        }
+        
+        .confirm-btn {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        
+        .save-btn {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 40px;
+            text-align: center;
+            color: var(--light-text);
+        }
+        
+        .empty-state h3 {
+            margin-bottom: 10px;
+        }
+        
+        .empty-state p {
+            max-width: 400px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .latest-indicator {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+        }
+        
+        .message-actions-small {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed #e0e0e0;
+        }
+        
+        .action-btn-small {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            color: white;
+            font-size: 0.75rem;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+        
+        .delete-btn-small {
+            background-color: var(--danger-color);
+        }
+        
+        .delete-btn-small:hover {
+            background-color: #a4262c;
+        }
+        
+        .keep-btn-small {
+            background-color: var(--success-color);
+        }
+        
+        .keep-btn-small:hover {
+            background-color: #0e6b0e;
+        }
+        
+        .review-btn-small {
+            background-color: var(--warning-color);
+        }
+        
+        .review-btn-small:hover {
+            background-color: #e69500;
+        }
+        
+        .comment-btn-small {
+            background-color: var(--primary-color);
+        }
+        
+        .comment-btn-small:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        .copy-btn-small {
+            background-color: var(--primary-medium);
+        }
+        
+        .copy-btn-small:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        .outlook-btn-small {
+            background-color: var(--outlook-color);
+        }
+        
+        .outlook-btn-small:hover {
+            background-color: var(--outlook-dark);
+        }
+        
+        .conversation-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .conversation-action-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            color: white;
+            font-size: 0.85rem;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        
+        .conversation-keep-btn {
+            background-color: var(--success-color);
+        }
+        
+        .conversation-keep-btn:hover {
+            background-color: #0e6b0e;
+        }
+        
+        .conversation-review-btn {
+            background-color: var(--warning-color);
+        }
+        
+        .conversation-review-btn:hover {
+            background-color: #e69500;
+        }
+        
+        .conversation-delete-btn {
+            background-color: var(--danger-color);
+        }
+        
+        .conversation-delete-btn:hover {
+            background-color: #a4262c;
+        }
+        
+        .conversation-copy-btn {
+            background-color: var(--primary-medium);
+        }
+        
+        .conversation-copy-btn:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        .conversation-outlook-btn {
+            background-color: var(--outlook-color);
+        }
+        
+        .conversation-outlook-btn:hover {
+            background-color: var(--outlook-dark);
+        }
+        
+        .thread-indicator {
+            display: inline-block;
+            background-color: #e1f5fe;
+            color: var(--primary-color);
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            border: 1px solid var(--primary-color);
+        }
+        
+        .email-thread {
+            border-left: 3px solid var(--primary-color);
+            margin: 10px 0;
+            padding-left: 15px;
+            background-color: #f8f8f8;
+            border-radius: 4px;
+        }
+        
+        .email-thread-header {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: var(--primary-color);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .email-thread-header:hover {
+            text-decoration: underline;
+        }
+        
+        .email-thread-content {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: white;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .email-thread-meta {
+            font-size: 0.8rem;
+            color: var(--light-text);
+            margin-bottom: 5px;
+        }
+        
+        .expand-icon {
+            font-size: 0.8rem;
+        }
+        
+        .collapsed {
+            display: none;
+        }
+
+        .recipients-list {
+            display: inline-block;
+        }
+
+        .recipients-summary {
+            cursor: pointer;
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .recipients-tooltip {
+            display: none;
+            position: absolute;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 8px 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 100;
+            max-width: 300px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .recipients-tooltip.show {
+            display: block;
+        }
+
+        .recipients-tooltip ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .recipients-tooltip li {
+            padding: 2px 0;
+            font-size: 0.85rem;
+        }
+        
+        .attachments {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px dashed #e0e0e0;
+        }
+        
+        .attachments h4 {
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: var(--light-text);
+        }
+        
+        .attachment-list {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .attachment-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        
+        .attachment-item:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .attachment-icon {
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+        
+        .attachment-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+        
+        .attachment-link:hover {
+            text-decoration: underline;
+        }
+        
+        .multi-thread-indicator {
+            display: inline-block;
+            background-color: #fff2cc;
+            color: #8a6d00;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            border: 1px solid #ffd966;
+        }
+        
+        .comments-section {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px dashed #e0e0e0;
+        }
+        
+        .comments-section h4 {
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: var(--light-text);
+        }
+        
+        .comment-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .comment-item {
+            padding: 10px;
+            background-color: #f8f8f8;
+            border-radius: 4px;
+            border-left: 3px solid var(--primary-color);
+        }
+        
+        .comment-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: var(--primary-darker);
+        }
+        
+        .comment-labels {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 8px;
+        }
+        
+        .comment-label {
+            background-color: var(--primary-light);
+            color: var(--primary-darker);
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+        
+        .comment-text {
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+        
+        .comment-meta {
+            font-size: 0.7rem;
+            color: var(--light-text);
+            margin-top: 5px;
+            text-align: right;
+        }
+        
+        .comment-form {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f8f8f8;
+            border-radius: 4px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            font-size: 0.85rem;
+        }
+        
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+        
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+        
+        .form-group select[multiple] {
+            height: 120px;
+        }
+        
+        .labels-input-container {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .labels-input-container input {
+            flex: 1;
+        }
+        
+        .add-label-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 0 12px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        
+        .labels-display {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 8px;
+        }
+        
+        .label-tag {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background-color: var(--primary-light);
+            color: var(--primary-darker);
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+        }
+        
+        .remove-label {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--primary-darker);
+            font-weight: bold;
+            padding: 0;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .add-comment-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-weight: 500;
+            margin-right: 10px;
+        }
+        
+        .comment-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .msg-format-indicator {
+            display: inline-block;
+            background-color: #e1f5fe;
+            color: var(--primary-color);
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            border: 1px solid var(--primary-color);
+        }
+        
+        .copy-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            display: none;
+        }
+        
+        .copy-indicator.show {
+            display: block;
+            animation: fadeOut 2s forwards;
+        }
+        
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        
+        .key-id-preview {
+            font-size: 0.8rem;
+            color: var(--light-text);
+            margin-top: 5px;
+            font-style: italic;
+        }
+        
+        .label-preview {
+            font-size: 0.8rem;
+            color: var(--light-text);
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            border: 1px solid #f5c6cb;
+        }
+
+        /* Updated comment modal styles */
+        .mandatory-field::after {
+            content: " *";
+            color: var(--danger-color);
+        }
+
+        .form-group.required label::after {
+            content: " *";
+            color: var(--danger-color);
+        }
+
+        .key-id-single {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        /* Smart comment display styles */
+        .comments-section-smart {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 8px;
+            border-left: 4px solid var(--primary-color);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .comments-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .comments-title {
+            font-weight: 600;
+            color: var(--primary-darker);
+            font-size: 0.95rem;
+        }
+
+        .comments-count {
+            background: var(--primary-color);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .comment-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 12px;
+        }
+
+        .comment-card {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .comment-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-color: var(--primary-light);
+        }
+
+        .comment-card.expanded {
+            grid-column: 1 / -1;
+        }
+
+        .comment-key-section {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px dashed #e0e0e0;
+        }
+
+        .key-id-badge {
+            background: var(--primary-color);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .key-label-badge {
+            background: var(--primary-light);
+            color: var(--primary-darker);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .comment-labels-smart {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .comment-label-smart {
+            background: #e9ecef;
+            color: #495057;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+
+        .comment-text-smart {
+            font-size: 0.85rem;
+            line-height: 1.4;
+            color: var(--text-color);
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .comment-text-smart.expanded {
+            -webkit-line-clamp: unset;
+        }
+
+        .comment-meta-smart {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+            padding-top: 6px;
+            border-top: 1px dashed #e0e0e0;
+            font-size: 0.7rem;
+            color: var(--light-text);
+        }
+
+        .expand-toggle {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            cursor: pointer;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 2px 0;
+        }
+
+        .expand-toggle:hover {
+            text-decoration: underline;
+        }
+
+        .comment-actions-smart {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .comment-action-btn {
+            background: none;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 0.65rem;
+            cursor: pointer;
+            color: var(--light-text);
+            transition: all 0.2s;
+        }
+
+        .comment-action-btn:hover {
+            background: var(--primary-light);
+            color: var(--primary-darker);
+        }
+
+        /* Validation styles */
+        .form-group.error input,
+        .form-group.error select {
+            border-color: var(--danger-color);
+            box-shadow: 0 0 0 2px rgba(211, 47, 47, 0.1);
+        }
+
+        .error-message-small {
+            color: var(--danger-color);
+            font-size: 0.75rem;
+            margin-top: 4px;
+            display: none;
+        }
+
+        .form-group.error .error-message-small {
+            display: block;
+        }
+
+        /* Empty comments state */
+        .no-comments {
+            text-align: center;
+            padding: 20px;
+            color: var(--light-text);
+            font-style: italic;
+        }
+
+        .no-comments-icon {
+            font-size: 2rem;
+            margin-bottom: 8px;
+            opacity: 0.5;
+        }
+
+        /* Button tooltips */
+        .tooltip {
+            position: relative;
+        }
+
+        .tooltip::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+            z-index: 1000;
+        }
+
+        .tooltip:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .comment-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .comment-card.expanded {
+                grid-column: 1;
+            }
+            
+            .header-controls {
+                gap: 10px;
+            }
+            
+            .message-counter {
+                font-size: 0.9rem;
+            }
+            
+            .action-buttons {
+                gap: 10px;
+            }
+            
+            .action-btn {
+                min-width: auto;
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="app-title">
+            <h1>MSG Analyser</h1>
+            <span class="msg-format-indicator">.msg format</span>
+        </div>
+        <div class="header-controls">
+            <div class="message-counter">
+                <span id="view-type-indicator">Message</span> <span id="current-index">0</span> of <span id="total-count">0</span>
+            </div>
+            <button class="refresh-btn" id="refresh-btn" title="Refresh data">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M17.645 6.35C16.195 4.9 14.205 4 12 4C7.575 4 4 7.575 4 12C4 16.425 7.575 20 12 20C15.73 20 18.84 17.445 19.73 14H17.645C16.83 16.33 14.61 18 12 18C8.685 18 6 15.315 6 12C6 8.685 8.685 6 12 6C13.66 6 15.14 6.69 16.22 7.78L13 11H20V4L17.645 6.35Z" fill="currentColor"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+    
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="folder-selector">
+                <select id="process-select">
+                    <option value="">-- Select a folder --</option>
+                </select>
+            </div>
+            
+            <div class="filter-options">
+                <h3>Filter by status</h3>
+                <div class="status-filters">
+                    <div class="status-filter">
+                        <input type="checkbox" id="show-keep" checked>
+                        <label for="show-keep">Keep</label>
+                    </div>
+                    <div class="status-filter">
+                        <input type="checkbox" id="show-review" checked>
+                        <label for="show-review">To Review</label>
+                    </div>
+                    <div class="status-filter">
+                        <input type="checkbox" id="show-untagged" checked>
+                        <label for="show-untagged">Untagged</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="view-options">
+                <h3>View</h3>
+                <div class="view-toggle">
+                    <div class="view-option active" data-view="single">Single Messages</div>
+                    <div class="view-option" data-view="conversation">Conversations</div>
+                </div>
+            </div>
+            
+            <div class="conversation-list hidden" id="conversation-list">
+                <!-- Conversations will be dynamically displayed here -->
+            </div>
+            
+            <div class="message-list" id="message-list">
+                <!-- Messages will be dynamically displayed here -->
+            </div>
+        </div>
+        
+        <div class="content-area">
+            <div class="message-header">
+                <div class="message-subject-large" id="message-subject">Select a message</div>
+                <div id="message-comments"></div>
+                <div class="message-meta-large">
+                    <div class="message-meta-row">
+                        <div><strong>From:</strong> <span id="message-from">--</span></div>
+                        <div class="recipients-list">
+                            <strong>To:</strong> <span id="message-to">--</span>
+                        </div>
+                        <div><strong>Date:</strong> <span id="message-date">--/--/---- --:--</span></div>
+                        <div><strong>Status:</strong> <span id="message-status">--</span></div>
+                    </div>
+                    <div id="message-attachments-header"></div>
+                </div>
+            </div>
+            
+            <div class="message-content">
+                <div class="single-message-view" id="single-message-view">
+                    <div class="message-body" id="message-body">
+                        <div class="empty-state">
+                            <h3>No message selected</h3>
+                            <p>Select a process in the left panel, then click on a message to display its content.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="conversation-view hidden" id="conversation-view">
+                    <div class="empty-state">
+                        <h3>No conversation selected</h3>
+                        <p>Select a conversation in the left panel to view the entire thread.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="message-actions">
+                <div class="nav-buttons">
+                    <button id="prev-btn">Previous</button>
+                    <button id="next-btn">Next</button>
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="action-btn delete-btn hidden" id="delete-btn">Delete</button>
+                    <button class="action-btn keep-btn" id="keep-btn">Keep</button>
+                    <button class="action-btn review-btn" id="review-btn">To Review</button>
+                    <button class="action-btn comment-btn" id="comment-btn">Comment</button>
+                    <button class="action-btn copy-btn" id="copy-btn">Copy</button>
+                    <button class="action-btn outlook-btn tooltip" id="outlook-btn" data-tooltip="Open in Outlook">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                            <polyline points="22,6 12,13 2,6"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Confirmation modal for single message deletion -->
+    <div class="modal" id="delete-modal">
+        <div class="modal-content">
+            <h3>Confirm Deletion</h3>
+            <p id="delete-modal-message">Are you sure you want to delete this message? This action cannot be undone.</p>
+            <div class="modal-buttons">
+                <button class="cancel-btn" id="cancel-delete">Cancel</button>
+                <button class="confirm-btn" id="confirm-delete">Delete Permanently</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Confirmation modal for conversation deletion -->
+    <div class="modal" id="delete-conversation-modal">
+        <div class="modal-content">
+            <h3>Confirm Conversation Deletion</h3>
+            <p id="delete-conversation-modal-message">Are you sure you want to delete this entire conversation? This will delete all messages in the conversation and cannot be undone.</p>
+            <div class="modal-buttons">
+                <button class="cancel-btn" id="cancel-delete-conversation">Cancel</button>
+                <button class="confirm-btn" id="confirm-delete-conversation">Delete Entire Conversation</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Updated Comment Modal -->
+    <div class="modal" id="comment-modal">
+        <div class="modal-content">
+            <h3>Add Comment</h3>
+            <div id="comment-form-container">
+                <div class="form-group required" id="key-id-group">
+                    <label for="comment-key-ids" class="mandatory-field">Key ID</label>
+                    <select id="comment-key-ids" class="key-id-single">
+                        <option value="">-- Select a Key ID --</option>
+                        <!-- Options will be populated from CSV -->
+                    </select>
+                    <div class="error-message-small" id="key-id-error">Please select a Key ID</div>
+                    <div class="key-id-preview" id="key-id-preview">Selected ID will appear here</div>
+                </div>
+                
+                <div class="form-group required" id="key-label-group">
+                    <label for="comment-key-label" class="mandatory-field">Key Label</label>
+                    <input type="text" id="comment-key-label" placeholder="Enter label (will be converted to uppercase, special characters removed)">
+                    <div class="error-message-small" id="key-label-error">Please enter a Key Label</div>
+                    <div class="label-preview" id="label-preview">Transformed label will appear here</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="comment-labels">Additional Labels (comma separated)</label>
+                    <div class="labels-input-container">
+                        <input type="text" id="comment-labels" placeholder="Enter labels separated by commas">
+                        <button class="add-label-btn" id="add-label-btn">+</button>
+                    </div>
+                    <div class="labels-display" id="labels-display"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="comment-text">Comment</label>
+                    <textarea id="comment-text" placeholder="Enter your comment (optional)"></textarea>
+                </div>
+            </div>
+            <div class="comment-actions">
+                <button class="add-comment-btn" id="add-comment-btn">Add Comment</button>
+                <button class="cancel-btn" id="cancel-comment">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Copy indicator -->
+    <div class="copy-indicator" id="copy-indicator">Copied to clipboard!</div>
+
+    <script>
+        // API Configuration - CORRIGÉ
+        const API_BASE_URL = '/api';
+
+        // Application state
+        let currentProcess = '';
+        let currentMessages = [];
+        let filteredMessages = [];
+        let currentConversations = [];
+        let currentIndex = 0;
+        let currentView = 'single';
+        let currentThreadId = null;
+        let selectedMessageInConversation = null;
+        let deleteMode = 'single';
+        let currentLabels = [];
+        let validKeyIds = [];
+        
+        // DOM Elements - CORRIGÉ (suppression des doublons)
+        const processSelect = document.getElementById('process-select');
+        const messageList = document.getElementById('message-list');
+        const conversationList = document.getElementById('conversation-list');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const currentIndexSpan = document.getElementById('current-index');
+        const totalCountSpan = document.getElementById('total-count');
+        const viewTypeIndicator = document.getElementById('view-type-indicator');
+        const messageSubject = document.getElementById('message-subject');
+        const messageFrom = document.getElementById('message-from');
+        const messageTo = document.getElementById('message-to');
+        const messageDate = document.getElementById('message-date');
+        const messageStatus = document.getElementById('message-status');
+        const messageBody = document.getElementById('message-body');
+        const messageComments = document.getElementById('message-comments');
+        const messageAttachmentsHeader = document.getElementById('message-attachments-header');
+        const singleMessageView = document.getElementById('single-message-view');
+        const conversationView = document.getElementById('conversation-view');
+        const deleteBtn = document.getElementById('delete-btn');
+        const keepBtn = document.getElementById('keep-btn');
+        const reviewBtn = document.getElementById('review-btn');
+        const commentBtn = document.getElementById('comment-btn');
+        const copyBtn = document.getElementById('copy-btn');
+        const outlookBtn = document.getElementById('outlook-btn');
+        const deleteModal = document.getElementById('delete-modal');
+        const deleteModalMessage = document.getElementById('delete-modal-message');
+        const cancelDeleteBtn = document.getElementById('cancel-delete');
+        const confirmDeleteBtn = document.getElementById('confirm-delete');
+        const deleteConversationModal = document.getElementById('delete-conversation-modal');
+        const deleteConversationModalMessage = document.getElementById('delete-conversation-modal-message');
+        const cancelDeleteConversationBtn = document.getElementById('cancel-delete-conversation');
+        const confirmDeleteConversationBtn = document.getElementById('confirm-delete-conversation');
+        const showKeepCheckbox = document.getElementById('show-keep');
+        const showReviewCheckbox = document.getElementById('show-review');
+        const showUntaggedCheckbox = document.getElementById('show-untagged');
+        const viewOptions = document.querySelectorAll('.view-option');
+        const commentModal = document.getElementById('comment-modal');
+        const commentKeyIds = document.getElementById('comment-key-ids');
+        const commentKeyLabel = document.getElementById('comment-key-label');
+        const commentLabels = document.getElementById('comment-labels');
+        const commentText = document.getElementById('comment-text');
+        const addLabelBtn = document.getElementById('add-label-btn');
+        const labelsDisplay = document.getElementById('labels-display');
+        const addCommentBtn = document.getElementById('add-comment-btn');
+        const cancelCommentBtn = document.getElementById('cancel-comment');
+        const copyIndicator = document.getElementById('copy-indicator');
+        const keyIdPreview = document.getElementById('key-id-preview');
+        const labelPreview = document.getElementById('label-preview');
+        const refreshBtn = document.getElementById('refresh-btn');
+        
+        // Event listeners
+        processSelect.addEventListener('change', handleProcessChange);
+        prevBtn.addEventListener('click', showPrevious);
+        nextBtn.addEventListener('click', showNext);
+        deleteBtn.addEventListener('click', showDeleteModal);
+        keepBtn.addEventListener('click', markAsKeep);
+        reviewBtn.addEventListener('click', markAsReview);
+        commentBtn.addEventListener('click', showCommentModal);
+        copyBtn.addEventListener('click', copyContent);
+        outlookBtn.addEventListener('click', openInOutlook);
+        cancelDeleteBtn.addEventListener('click', hideDeleteModal);
+        confirmDeleteBtn.addEventListener('click', deleteCurrentMessage);
+        cancelDeleteConversationBtn.addEventListener('click', hideDeleteConversationModal);
+        confirmDeleteConversationBtn.addEventListener('click', deleteCurrentConversation);
+        showKeepCheckbox.addEventListener('change', applyFilters);
+        showReviewCheckbox.addEventListener('change', applyFilters);
+        showUntaggedCheckbox.addEventListener('change', applyFilters);
+        addLabelBtn.addEventListener('click', addLabel);
+        addCommentBtn.addEventListener('click', addComment);
+        cancelCommentBtn.addEventListener('click', hideCommentModal);
+        commentKeyIds.addEventListener('change', updateKeyIdPreview);
+        commentKeyLabel.addEventListener('input', updateLabelPreview);
+        refreshBtn.addEventListener('click', refreshData);
+        
+        // View toggle
+        viewOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                viewOptions.forEach(opt => opt.classList.remove('active'));
+                option.classList.add('active');
+                currentView = option.dataset.view;
+                switchView(currentView);
+            });
+        });
+        
+        // Functions
+        async function handleProcessChange() {
+            currentProcess = processSelect.value;
+            if (currentProcess) {
+                try {
+                    showLoading(true);
+                    const response = await fetch(`${API_BASE_URL}/messages/${currentProcess}`);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const messages = await response.json();
+                    currentMessages = messages.map(msg => ({
+                        ...msg,
+                        status: msg.status || 'untagged',
+                        threadId: msg.threadId || `thread_${msg.id}`,
+                        comments: msg.comments || [],
+                        attachments: msg.attachments || []
+                    }));
+                    
+                    // Group messages by thread
+                    groupMessagesByThread();
+                    applyFilters();
+                    
+                    if (filteredMessages.length > 0 || currentConversations.length > 0) {
+                        currentIndex = 0;
+                        selectedMessageInConversation = null;
+                        if (currentView === 'single') {
+                            displayCurrentMessage();
+                        } else {
+                            displayCurrentConversation();
+                        }
+                    } else {
+                        clearMessageDisplay();
+                    }
+                } catch (error) {
+                    console.error('Error loading messages:', error);
+                    showError('Error loading messages. Please check if the backend server is running.');
+                } finally {
+                    showLoading(false);
+                }
+            } else {
+                clearMessageDisplay();
+            }
+        }
+        
+        // New refresh function
+        async function refreshData() {
+            // Add loading animation to refresh button
+            refreshBtn.classList.add('loading');
+            
+            try {
+                if (currentProcess) {
+                    // If a process is selected, reload its messages
+                    await handleProcessChange();
+                } else {
+                    // If no process is selected, reload the process list
+                    await loadProcesses();
+                }
+                
+                // Show success feedback
+                showCopyIndicator('Data refreshed successfully!');
+            } catch (error) {
+                console.error('Error refreshing data:', error);
+                showError('Error refreshing data');
+            } finally {
+                // Remove loading animation
+                refreshBtn.classList.remove('loading');
+            }
+        }
+        
+        function showLoading(show) {
+            const buttons = [prevBtn, nextBtn, keepBtn, reviewBtn, commentBtn, copyBtn, outlookBtn];
+            buttons.forEach(btn => {
+                if (show) {
+                    btn.disabled = true;
+                    if (btn === outlookBtn) {
+                        btn.innerHTML = '<span class="loading"></span>';
+                    } else {
+                        btn.innerHTML = '<span class="loading"></span>';
+                    }
+                } else {
+                    btn.disabled = false;
+                    if (btn === prevBtn) btn.innerHTML = 'Previous';
+                    if (btn === nextBtn) btn.innerHTML = 'Next';
+                    if (btn === keepBtn) btn.innerHTML = 'Keep';
+                    if (btn === reviewBtn) btn.innerHTML = 'To Review';
+                    if (btn === commentBtn) btn.innerHTML = 'Comment';
+                    if (btn === copyBtn) btn.innerHTML = 'Copy';
+                    if (btn === outlookBtn) btn.innerHTML = `
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                            <polyline points="22,6 12,13 2,6"/>
+                        </svg>
+                    `;
+                }
+            });
+        }
+        
+        function showError(message) {
+            // Remove any existing error messages
+            const existingError = document.querySelector('.error-message');
+            if (existingError) {
+                existingError.remove();
+            }
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            
+            // Insert error at the top of the content area
+            const contentArea = document.querySelector('.content-area');
+            contentArea.insertBefore(errorDiv, contentArea.firstChild);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    errorDiv.remove();
+                }
+            }, 5000);
+        }
+        
+        function groupMessagesByThread() {
+            const threads = {};
+            
+            currentMessages.forEach(message => {
+                if (!threads[message.threadId]) {
+                    threads[message.threadId] = {
+                        threadId: message.threadId,
+                        subject: message.subject.replace(/^(RE:|FW:)\s*/i, ''),
+                        messages: [],
+                        hasMultipleThreads: message.subThreads && message.subThreads.length > 0
+                    };
+                }
+                threads[message.threadId].messages.push(message);
+            });
+            
+            // Sort messages in each thread by date (newest first)
+            Object.values(threads).forEach(thread => {
+                thread.messages.sort((a, b) => new Date(b.date) - new Date(a.date));
+                // Update the conversation subject to the latest message's subject
+                if (thread.messages.length > 0) {
+                    thread.subject = thread.messages[0].subject.replace(/^(RE:|FW:)\s*/i, '');
+                }
+            });
+            
+            currentConversations = Object.values(threads);
+            
+            // Sort conversations by the date of the latest message (newest first)
+            currentConversations.sort((a, b) => {
+                const dateA = new Date(a.messages[0].date);
+                const dateB = new Date(b.messages[0].date);
+                return dateB - dateA;
+            });
+        }
+        
+        function applyFilters() {
+            const showKeep = showKeepCheckbox.checked;
+            const showReview = showReviewCheckbox.checked;
+            const showUntagged = showUntaggedCheckbox.checked;
+            
+            // Filter messages for single view
+            filteredMessages = currentMessages.filter(message => {
+                if (message.status === 'keep' && showKeep) return true;
+                if (message.status === 'review' && showReview) return true;
+                if (message.status === 'untagged' && showUntagged) return true;
+                return false;
+            });
+            
+            // Sort messages by date (newest first)
+            filteredMessages.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            // Filter conversations for conversation view
+            const filteredConversations = currentConversations.filter(conversation => {
+                return conversation.messages.some(message => {
+                    if (message.status === 'keep' && showKeep) return true;
+                    if (message.status === 'review' && showReview) return true;
+                    if (message.status === 'untagged' && showUntagged) return true;
+                    return false;
+                });
+            });
+            
+            if (currentView === 'single') {
+                renderMessageList();
+                
+                if (filteredMessages.length > 0) {
+                    currentIndex = Math.min(currentIndex, filteredMessages.length - 1);
+                    displayCurrentMessage();
+                } else {
+                    clearMessageDisplay();
+                }
+            } else {
+                renderConversationList(filteredConversations);
+                
+                if (filteredConversations.length > 0) {
+                    currentIndex = Math.min(currentIndex, filteredConversations.length - 1);
+                    displayCurrentConversation();
+                } else {
+                    clearConversationDisplay();
+                }
+            }
+        }
+        
+        function switchView(view) {
+            currentView = view;
+            selectedMessageInConversation = null;
+            
+            if (view === 'single') {
+                messageList.classList.remove('hidden');
+                conversationList.classList.add('hidden');
+                singleMessageView.classList.remove('hidden');
+                conversationView.classList.add('hidden');
+                viewTypeIndicator.textContent = 'Message';
+                // Show the delete button in single view
+                deleteBtn.classList.remove('hidden');
+                applyFilters();
+            } else {
+                messageList.classList.add('hidden');
+                conversationList.classList.remove('hidden');
+                singleMessageView.classList.add('hidden');
+                conversationView.classList.remove('hidden');
+                viewTypeIndicator.textContent = 'Conversation';
+                // Hide the delete button in conversation view
+                deleteBtn.classList.add('hidden');
+                applyFilters();
+            }
+        }
+        
+        function renderMessageList() {
+            messageList.innerHTML = '';
+            
+            if (filteredMessages.length === 0) {
+                const emptyItem = document.createElement('div');
+                emptyItem.className = 'empty-state';
+                emptyItem.innerHTML = `
+                    <h3>No messages</h3>
+                    <p>No messages match the selected filters.</p>
+                `;
+                messageList.appendChild(emptyItem);
+                return;
+            }
+            
+            filteredMessages.forEach((message, index) => {
+                const messageItem = document.createElement('div');
+                messageItem.className = `message-item ${index === currentIndex ? 'active' : ''}`;
+                messageItem.dataset.index = index;
+                
+                const statusClass = `status-badge status-${message.status}`;
+                const statusText = getStatusText(message.status);
+                
+                // Create a content preview (first 60 characters)
+                const preview = message.body.length > 60 ? 
+                    message.body.substring(0, 60) + '...' : message.body;
+                
+                // Check if message contains a thread
+                const threadIndicator = message.containsThread ? 
+                    '<span class="thread-indicator">Contains Thread</span>' : '';
+                
+                // Check if message has multiple threads
+                const multiThreadIndicator = message.subThreads && message.subThreads.length > 0 ?
+                    '<span class="multi-thread-indicator">Multiple Threads</span>' : '';
+                
+                messageItem.innerHTML = `
+                    <div class="message-subject">${message.subject} <span class="${statusClass}">${statusText}</span>${threadIndicator}${multiThreadIndicator}</div>
+                    <div class="message-preview">${preview}</div>
+                    <div class="message-meta">
+                        <span>${message.from.split('@')[0]}</span>
+                        <span>${formatDate(new Date(message.date))}</span>
+                    </div>
+                `;
+                
+                messageItem.addEventListener('click', () => {
+                    currentIndex = index;
+                    displayCurrentMessage();
+                    renderMessageList(); // To update the active class
+                });
+                
+                messageList.appendChild(messageItem);
+            });
+        }
+        
+        function renderConversationList(conversations) {
+            conversationList.innerHTML = '';
+            
+            if (conversations.length === 0) {
+                const emptyItem = document.createElement('div');
+                emptyItem.className = 'empty-state';
+                emptyItem.innerHTML = `
+                    <h3>No conversations</h3>
+                    <p>No conversations match the selected filters.</p>
+                `;
+                conversationList.appendChild(emptyItem);
+                return;
+            }
+            
+            conversations.forEach((conversation, index) => {
+                const conversationItem = document.createElement('div');
+                conversationItem.className = `conversation-item ${index === currentIndex ? 'active' : ''}`;
+                conversationItem.dataset.index = index;
+                
+                // Use the latest message in the conversation
+                const latestMessage = conversation.messages[0];
+                
+                // Check if any message in the conversation contains a thread
+                const hasThread = conversation.messages.some(msg => msg.containsThread);
+                const threadIndicator = hasThread ? 
+                    '<span class="thread-indicator">Contains Threads</span>' : '';
+                
+                // Check if conversation has multiple threads
+                const multiThreadIndicator = conversation.hasMultipleThreads ?
+                    '<span class="multi-thread-indicator">Multiple Threads</span>' : '';
+                
+                conversationItem.innerHTML = `
+                    <div class="conversation-subject">${conversation.subject} ${threadIndicator}${multiThreadIndicator}</div>
+                    <div class="conversation-meta">
+                        <span>${latestMessage.from.split('@')[0]} - ${formatDate(new Date(latestMessage.date))}</span>
+                        <span class="message-count">${conversation.messages.length} messages</span>
+                    </div>
+                `;
+                
+                conversationItem.addEventListener('click', () => {
+                    currentIndex = index;
+                    currentThreadId = conversation.threadId;
+                    selectedMessageInConversation = null;
+                    displayCurrentConversation();
+                    renderConversationList(conversations); // To update the active class
+                });
+                
+                conversationList.appendChild(conversationItem);
+            });
+        }
+        
+        function displayCurrentMessage() {
+            if (filteredMessages.length === 0) {
+                clearMessageDisplay();
+                return;
+            }
+            
+            const message = filteredMessages[currentIndex];
+            
+            // Update the interface
+            messageSubject.textContent = message.subject;
+            messageFrom.textContent = message.from;
+            
+            // Format recipients for display
+            const formattedRecipients = formatRecipients(message.to);
+            messageTo.innerHTML = formattedRecipients;
+            
+            // Add tooltip for multiple recipients
+            setupRecipientsTooltip(messageTo, message.to);
+            
+            const dateObj = new Date(message.date);
+            messageDate.textContent = formatFullDate(dateObj);
+            
+            // Add attachments to header if they exist
+            if (message.attachments && message.attachments.length > 0) {
+                const attachmentsHtml = createAttachmentsHeaderHtml(message.attachments);
+                messageAttachmentsHeader.innerHTML = attachmentsHtml;
+            } else {
+                messageAttachmentsHeader.innerHTML = '';
+            }
+            
+            // Add comments if they exist (using new smart display)
+            if (message.comments && message.comments.length > 0) {
+                const commentsHtml = createCommentsHtml(message.comments);
+                messageComments.innerHTML = commentsHtml;
+            } else {
+                messageComments.innerHTML = '';
+            }
+            
+            // Check if message contains a thread and format accordingly
+            if (message.containsThread) {
+                messageBody.innerHTML = formatEmailThread(message.body);
+            } else {
+                messageBody.innerHTML = `<div class="message-body">${message.body}</div>`;
+            }
+            
+            // Update the status
+            const statusText = getStatusText(message.status);
+            messageStatus.textContent = statusText;
+            
+            // Update the counter
+            currentIndexSpan.textContent = currentIndex + 1;
+            totalCountSpan.textContent = filteredMessages.length;
+            
+            // Enable/disable navigation buttons
+            prevBtn.disabled = currentIndex === 0;
+            nextBtn.disabled = currentIndex === filteredMessages.length - 1;
+            
+            // Update the list to reflect the active item
+            if (currentView === 'single') {
+                renderMessageList();
+            }
+        }
+        
+        function createAttachmentsHeaderHtml(attachments) {
+            let html = `
+                <div class="attachments">
+                    <h4>Attachments</h4>
+                    <div class="attachment-list">
+            `;
+            
+            attachments.forEach(attachment => {
+                // Use the backend URL for attachments
+                const attachmentUrl = `${API_BASE_URL}${attachment.url}`;
+                html += `
+                    <div class="attachment-item">
+                        <span class="attachment-icon">📎</span>
+                        <a href="${attachmentUrl}" class="attachment-link" target="_blank">${attachment.name}</a>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+            `;
+            
+            return html;
+        }
+        
+        function createCommentsHtml(comments) {
+            if (!comments || comments.length === 0) {
+                return '';
+            }
+            
+            let html = `
+                <div class="comments-section-smart">
+                    <div class="comments-header">
+                        <div class="comments-title">Comments</div>
+                        <div class="comments-count">${comments.length}</div>
+                    </div>
+                    <div class="comment-grid">
+            `;
+            
+            comments.forEach((comment, index) => {
+                const keyId = comment.key && comment.key.ids && comment.key.ids.length > 0 ? comment.key.ids[0] : 'No ID';
+                const keyLabel = comment.key && comment.key.label ? comment.key.label : 'No Label';
+                
+                html += `
+                    <div class="comment-card" data-comment-index="${index}">
+                        <div class="comment-key-section">
+                            <div class="key-id-badge">${keyId}</div>
+                            <div class="key-label-badge">${keyLabel}</div>
+                        </div>
+                `;
+                
+                if (comment.labels && comment.labels.length > 0) {
+                    html += `<div class="comment-labels-smart">`;
+                    comment.labels.forEach(label => {
+                        html += `<span class="comment-label-smart">${label}</span>`;
+                    });
+                    html += `</div>`;
+                }
+                
+                if (comment.text) {
+                    const isLongComment = comment.text.length > 150;
+                    html += `
+                        <div class="comment-text-smart ${isLongComment ? '' : 'expanded'}">
+                            ${comment.text}
+                        </div>
+                    `;
+                    
+                    if (isLongComment) {
+                        html += `
+                            <button class="expand-toggle" onclick="toggleCommentExpand(${index})">
+                                Show more
+                            </button>
+                        `;
+                    }
+                } else {
+                    html += `<div class="comment-text-smart" style="font-style: italic; color: var(--light-text);">No comment text</div>`;
+                }
+                
+                html += `
+                        <div class="comment-meta-smart">
+                            <span>${formatRelativeTime(new Date(comment.date))}</span>
+                            <span>${formatFullDate(new Date(comment.date))}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+            `;
+            
+            return html;
+        }
+
+        // New function to toggle comment expansion
+        function toggleCommentExpand(commentIndex) {
+            const commentCard = document.querySelector(`[data-comment-index="${commentIndex}"]`);
+            const commentText = commentCard.querySelector('.comment-text-smart');
+            const expandToggle = commentCard.querySelector('.expand-toggle');
+            
+            if (commentCard.classList.contains('expanded')) {
+                commentCard.classList.remove('expanded');
+                commentText.classList.remove('expanded');
+                expandToggle.textContent = 'Show more';
+            } else {
+                commentCard.classList.add('expanded');
+                commentText.classList.add('expanded');
+                expandToggle.textContent = 'Show less';
+            }
+        }
+
+        // Helper function for relative time
+        function formatRelativeTime(date) {
+            const now = new Date();
+            const diffInSeconds = Math.floor((now - date) / 1000);
+            
+            if (diffInSeconds < 60) return 'Just now';
+            if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+            if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+            if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+            
+            return formatDate(date);
+        }
+        
+        function formatRecipients(recipients) {
+            const recipientsArray = recipients.split(',').map(r => r.trim());
+            
+            if (recipientsArray.length <= 2) {
+                return recipients;
+            }
+            
+            return `<span class="recipients-summary">${recipientsArray[0]}, ${recipientsArray[1]} +${recipientsArray.length - 2} more</span>`;
+        }
+        
+        function setupRecipientsTooltip(element, recipients) {
+            const recipientsArray = recipients.split(',').map(r => r.trim());
+            
+            if (recipientsArray.length <= 2) {
+                return;
+            }
+            
+            // Create tooltip if it doesn't exist
+            let tooltip = element.querySelector('.recipients-tooltip');
+            if (!tooltip) {
+                tooltip = document.createElement('div');
+                tooltip.className = 'recipients-tooltip';
+                
+                const list = document.createElement('ul');
+                recipientsArray.forEach(recipient => {
+                    const li = document.createElement('li');
+                    li.textContent = recipient;
+                    list.appendChild(li);
+                });
+                
+                tooltip.appendChild(list);
+                element.appendChild(tooltip);
+                
+                // Add event listeners to show/hide tooltip
+                const summary = element.querySelector('.recipients-summary');
+                summary.addEventListener('mouseenter', () => {
+                    tooltip.classList.add('show');
+                });
+                
+                summary.addEventListener('mouseleave', () => {
+                    tooltip.classList.remove('show');
+                });
+            }
+        }
+        
+        function formatEmailThread(body) {
+            // Simple heuristic to detect email threads
+            const threadSeparators = [
+                '------------------------',
+                '-----------------------',
+                '________________________',
+                'From:',
+                'Sent:',
+                'To:',
+                'Subject:',
+                'On',
+                'wrote:'
+            ];
+            
+            let formattedBody = `<div class="message-body">`;
+            let inThread = false;
+            let threadCount = 0;
+            
+            const lines = body.split('\n');
+            let currentThread = '';
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                
+                // Check if this line indicates the start of a thread
+                const isThreadStart = threadSeparators.some(separator => 
+                    line.trim().startsWith(separator) || 
+                    (i > 0 && lines[i-1].trim() === '' && line.includes('From:'))
+                );
+                
+                if (isThreadStart && !inThread) {
+                    // If we were building a thread, add it now
+                    if (currentThread) {
+                        formattedBody += createThreadElement(currentThread, threadCount);
+                        threadCount++;
+                        currentThread = '';
+                    }
+                    
+                    inThread = true;
+                    currentThread += line + '\n';
+                } else if (inThread) {
+                    currentThread += line + '\n';
+                    
+                    // Check if we've reached the end of the thread (empty line followed by non-thread content)
+                    if (line.trim() === '' && i < lines.length - 1) {
+                        const nextLine = lines[i+1];
+                        const isNextLineThread = threadSeparators.some(separator => 
+                            nextLine.trim().startsWith(separator)
+                        );
+                        
+                        if (!isNextLineThread) {
+                            formattedBody += createThreadElement(currentThread, threadCount);
+                            threadCount++;
+                            currentThread = '';
+                            inThread = false;
+                        }
+                    }
+                } else {
+                    // This is the main message content
+                    formattedBody += line + '\n';
+                }
+            }
+            
+            // Add any remaining thread
+            if (currentThread) {
+                formattedBody += createThreadElement(currentThread, threadCount);
+            }
+            
+            formattedBody += `</div>`;
+            return formattedBody;
+        }
+        
+        function createThreadElement(threadContent, index) {
+            const threadId = `thread-${index}`;
+            return `
+                <div class="email-thread">
+                    <div class="email-thread-header" onclick="toggleThread('${threadId}')">
+                        <span class="expand-icon">▶</span>
+                        Previous Email Exchange
+                    </div>
+                    <div class="email-thread-content collapsed" id="${threadId}">
+                        <div class="email-thread-meta">This email contains previous exchanges where you were not initially included</div>
+                        <pre>${threadContent}</pre>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function toggleThread(threadId) {
+            const threadElement = document.getElementById(threadId);
+            const header = threadElement.previousElementSibling;
+            const icon = header.querySelector('.expand-icon');
+            
+            if (threadElement.classList.contains('collapsed')) {
+                threadElement.classList.remove('collapsed');
+                icon.textContent = '▼';
+            } else {
+                threadElement.classList.add('collapsed');
+                icon.textContent = '▶';
+            }
+        }
+        
+        function displayCurrentConversation() {
+            const filteredConversations = currentConversations.filter(conversation => {
+                return conversation.messages.some(message => {
+                    const showKeep = showKeepCheckbox.checked;
+                    const showReview = showReviewCheckbox.checked;
+                    const showUntagged = showUntaggedCheckbox.checked;
+                    
+                    if (message.status === 'keep' && showKeep) return true;
+                    if (message.status === 'review' && showReview) return true;
+                    if (message.status === 'untagged' && showUntagged) return true;
+                    return false;
+                });
+            });
+            
+            if (filteredConversations.length === 0) {
+                clearConversationDisplay();
+                return;
+            }
+            
+            const conversation = filteredConversations[currentIndex];
+            const latestMessage = conversation.messages[0];
+            
+            // Update the interface with the latest message's information
+            messageSubject.textContent = latestMessage.subject;
+            messageFrom.textContent = latestMessage.from;
+            
+            // Format recipients for display
+            const formattedRecipients = formatRecipients(latestMessage.to);
+            messageTo.innerHTML = formattedRecipients;
+            
+            // Add tooltip for multiple recipients
+            setupRecipientsTooltip(messageTo, latestMessage.to);
+            
+            messageDate.textContent = formatFullDate(new Date(latestMessage.date));
+            messageStatus.textContent = getStatusText(latestMessage.status);
+            
+            // Add attachments to header if they exist
+            if (latestMessage.attachments && latestMessage.attachments.length > 0) {
+                const attachmentsHtml = createAttachmentsHeaderHtml(latestMessage.attachments);
+                messageAttachmentsHeader.innerHTML = attachmentsHtml;
+            } else {
+                messageAttachmentsHeader.innerHTML = '';
+            }
+            
+            // Display all messages in the conversation
+            conversationView.innerHTML = '';
+            
+            conversation.messages.forEach((message, index) => {
+                const messageElement = document.createElement('div');
+                messageElement.className = `conversation-message ${selectedMessageInConversation === message.id ? 'active' : ''}`;
+                messageElement.dataset.messageId = message.id;
+                
+                const statusClass = `status-badge status-${message.status}`;
+                const statusText = getStatusText(message.status);
+                
+                // Check if message contains a thread
+                const threadIndicator = message.containsThread ? 
+                    '<span class="thread-indicator">Contains Thread</span>' : '';
+                
+                // Format recipients for display in conversation view
+                const formattedRecipients = formatRecipients(message.to);
+                
+                messageElement.innerHTML = `
+                    <div class="message-header-small">
+                        <div class="message-subject-small">
+                            ${message.subject} 
+                            <span class="${statusClass}">${statusText}</span>
+                            ${threadIndicator}
+                            ${index === 0 ? '<span class="latest-indicator">Latest</span>' : ''}
+                        </div>
+                        <div class="message-meta-small">
+                            <div><strong>From:</strong> ${message.from}</div>
+                            <div class="recipients-list"><strong>To:</strong> ${formattedRecipients}</div>
+                            <div><strong>Date:</strong> ${formatFullDate(new Date(message.date))}</div>
+                        </div>
+                        <div class="message-actions-small">
+                            <button class="action-btn-small delete-btn-small tooltip" data-message-id="${message.id}" data-tooltip="Delete">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                                </svg>
+                            </button>
+                            <button class="action-btn-small keep-btn-small tooltip" data-message-id="${message.id}" data-tooltip="Keep">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                </svg>
+                            </button>
+                            <button class="action-btn-small review-btn-small tooltip" data-message-id="${message.id}" data-tooltip="To Review">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                                </svg>
+                            </button>
+                            <button class="action-btn-small comment-btn-small tooltip" data-message-id="${message.id}" data-tooltip="Comment">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                                </svg>
+                            </button>
+                            <button class="action-btn-small copy-btn-small tooltip" data-message-id="${message.id}" data-tooltip="Copy">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                                </svg>
+                            </button>
+                            <button class="action-btn-small outlook-btn-small tooltip" data-message-id="${message.id}" data-tooltip="Open in Outlook">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                    <polyline points="22,6 12,13 2,6"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="message-body-small">
+                        ${message.comments && message.comments.length > 0 ? createCommentsHtml(message.comments) : ''}
+                        ${message.containsThread ? formatEmailThread(message.body) : message.body}
+                        ${message.attachments && message.attachments.length > 0 ? createAttachmentsHtml(message.attachments) : ''}
+                    </div>
+                `;
+                
+                // Add tooltip for multiple recipients in conversation view
+                const recipientsElement = messageElement.querySelector('.recipients-list');
+                setupRecipientsTooltip(recipientsElement, message.to);
+                
+                // Add click handler to select individual message in conversation
+                const header = messageElement.querySelector('.message-header-small');
+                header.addEventListener('click', (e) => {
+                    // Don't trigger if clicking on action buttons
+                    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+                    
+                    // Remove active class from all messages
+                    document.querySelectorAll('.conversation-message').forEach(msg => {
+                        msg.classList.remove('active');
+                    });
+                    // Add active class to clicked message
+                    messageElement.classList.add('active');
+                    selectedMessageInConversation = message.id;
+                    
+                    // Update the main header with this message's info
+                    messageSubject.textContent = message.subject;
+                    messageFrom.textContent = message.from;
+                    
+                    // Format recipients for display
+                    const formattedRecipients = formatRecipients(message.to);
+                    messageTo.innerHTML = formattedRecipients;
+                    
+                    // Add tooltip for multiple recipients
+                    setupRecipientsTooltip(messageTo, message.to);
+                    
+                    messageDate.textContent = formatFullDate(new Date(message.date));
+                    messageStatus.textContent = getStatusText(message.status);
+                    
+                    // Update attachments in header
+                    if (message.attachments && message.attachments.length > 0) {
+                        const attachmentsHtml = createAttachmentsHeaderHtml(message.attachments);
+                        messageAttachmentsHeader.innerHTML = attachmentsHtml;
+                    } else {
+                        messageAttachmentsHeader.innerHTML = '';
+                    }
+                });
+                
+                // Add event listeners for individual message action buttons
+                const deleteBtnSmall = messageElement.querySelector('.delete-btn-small');
+                const keepBtnSmall = messageElement.querySelector('.keep-btn-small');
+                const reviewBtnSmall = messageElement.querySelector('.review-btn-small');
+                const commentBtnSmall = messageElement.querySelector('.comment-btn-small');
+                const copyBtnSmall = messageElement.querySelector('.copy-btn-small');
+                const outlookBtnSmall = messageElement.querySelector('.outlook-btn-small');
+                
+                deleteBtnSmall.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectedMessageInConversation = message.id;
+                    deleteMode = 'single';
+                    showDeleteModal();
+                });
+                
+                keepBtnSmall.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    markSingleMessageAsKeep(message.id);
+                });
+                
+                reviewBtnSmall.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    markSingleMessageAsReview(message.id);
+                });
+                
+                commentBtnSmall.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectedMessageInConversation = message.id;
+                    showCommentModal();
+                });
+                
+                copyBtnSmall.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    copyMessageContent(message);
+                });
+                
+                outlookBtnSmall.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openMessageInOutlook(message);
+                });
+                
+                conversationView.appendChild(messageElement);
+            });
+            
+            // Add conversation-level actions
+            const conversationActions = document.createElement('div');
+            conversationActions.className = 'conversation-actions';
+            conversationActions.innerHTML = `
+                <button class="conversation-action-btn conversation-keep-btn">Keep All Messages</button>
+                <button class="conversation-action-btn conversation-review-btn">Mark All for Review</button>
+                <button class="conversation-action-btn conversation-delete-btn">Delete All Messages</button>
+                <button class="conversation-action-btn conversation-copy-btn">Copy Conversation</button>
+                <button class="conversation-action-btn conversation-outlook-btn tooltip" data-tooltip="Open Latest in Outlook">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                        <polyline points="22,6 12,13 2,6"/>
+                    </svg>
+                </button>
+            `;
+            
+            conversationActions.querySelector('.conversation-keep-btn').addEventListener('click', () => {
+                markAllMessagesInConversationAsKeep(conversation.threadId);
+            });
+            
+            conversationActions.querySelector('.conversation-review-btn').addEventListener('click', () => {
+                markAllMessagesInConversationAsReview(conversation.threadId);
+            });
+            
+            conversationActions.querySelector('.conversation-delete-btn').addEventListener('click', () => {
+                deleteMode = 'conversation';
+                currentThreadId = conversation.threadId;
+                showDeleteConversationModal();
+            });
+            
+            conversationActions.querySelector('.conversation-copy-btn').addEventListener('click', () => {
+                copyConversationContent(conversation);
+            });
+            
+            conversationActions.querySelector('.conversation-outlook-btn').addEventListener('click', () => {
+                const conversation = filteredConversations[currentIndex];
+                if (conversation && conversation.messages.length > 0) {
+                    openMessageInOutlook(conversation.messages[0]);
+                }
+            });
+            
+            conversationView.appendChild(conversationActions);
+            
+            // Update the counter
+            currentIndexSpan.textContent = currentIndex + 1;
+            totalCountSpan.textContent = filteredConversations.length;
+            
+            // Enable/disable navigation buttons
+            prevBtn.disabled = currentIndex === 0;
+            nextBtn.disabled = currentIndex === filteredConversations.length - 1;
+            
+            // Update the list to reflect the active item
+            renderConversationList(filteredConversations);
+        }
+        
+        function createAttachmentsHtml(attachments) {
+            let html = `
+                <div class="attachments">
+                    <h4>Attachments</h4>
+                    <div class="attachment-list">
+            `;
+            
+            attachments.forEach(attachment => {
+                // Use the backend URL for attachments
+                const attachmentUrl = `${API_BASE_URL}${attachment.url}`;
+                html += `
+                    <div class="attachment-item">
+                        <span class="attachment-icon">📎</span>
+                        <a href="${attachmentUrl}" class="attachment-link" target="_blank">${attachment.name}</a>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+            `;
+            
+            return html;
+        }
+        
+        function clearMessageDisplay() {
+            messageSubject.textContent = 'Select a message';
+            messageFrom.textContent = '--';
+            messageTo.textContent = '--';
+            messageDate.textContent = '--/--/---- --:--';
+            messageStatus.textContent = '--';
+            messageBody.innerHTML = `
+                <div class="empty-state">
+                    <h3>No message selected</h3>
+                    <p>Select a process in the left panel, then click on a message to display its content.</p>
+                </div>
+            `;
+            messageComments.innerHTML = '';
+            messageAttachmentsHeader.innerHTML = '';
+            
+            currentIndexSpan.textContent = '0';
+            totalCountSpan.textContent = '0';
+            
+            prevBtn.disabled = true;
+            nextBtn.disabled = true;
+        }
+        
+        function clearConversationDisplay() {
+            messageSubject.textContent = 'Select a conversation';
+            messageFrom.textContent = '--';
+            messageTo.textContent = '--';
+            messageDate.textContent = '--/--/---- --:--';
+            messageStatus.textContent = '--';
+            conversationView.innerHTML = `
+                <div class="empty-state">
+                    <h3>No conversation selected</h3>
+                    <p>Select a conversation in the left panel to view the entire thread.</p>
+                </div>
+            `;
+            messageComments.innerHTML = '';
+            messageAttachmentsHeader.innerHTML = '';
+            
+            currentIndexSpan.textContent = '0';
+            totalCountSpan.textContent = '0';
+            
+            prevBtn.disabled = true;
+            nextBtn.disabled = true;
+        }
+        
+        function showPrevious() {
+            if (currentView === 'single') {
+                if (currentIndex > 0) {
+                    currentIndex--;
+                    displayCurrentMessage();
+                }
+            } else {
+                const filteredConversations = currentConversations.filter(conversation => {
+                    return conversation.messages.some(message => {
+                        const showKeep = showKeepCheckbox.checked;
+                        const showReview = showReviewCheckbox.checked;
+                        const showUntagged = showUntaggedCheckbox.checked;
+                        
+                        if (message.status === 'keep' && showKeep) return true;
+                        if (message.status === 'review' && showReview) return true;
+                        if (message.status === 'untagged' && showUntagged) return true;
+                        return false;
+                    });
+                });
+                
+                if (currentIndex > 0) {
+                    currentIndex--;
+                    selectedMessageInConversation = null;
+                    displayCurrentConversation();
+                }
+            }
+        }
+        
+        function showNext() {
+            if (currentView === 'single') {
+                if (currentIndex < filteredMessages.length - 1) {
+                    currentIndex++;
+                    displayCurrentMessage();
+                }
+            } else {
+                const filteredConversations = currentConversations.filter(conversation => {
+                    return conversation.messages.some(message => {
+                        const showKeep = showKeepCheckbox.checked;
+                        const showReview = showReviewCheckbox.checked;
+                        const showUntagged = showUntaggedCheckbox.checked;
+                        
+                        if (message.status === 'keep' && showKeep) return true;
+                        if (message.status === 'review' && showReview) return true;
+                        if (message.status === 'untagged' && showUntagged) return true;
+                        return false;
+                    });
+                });
+                
+                if (currentIndex < filteredConversations.length - 1) {
+                    currentIndex++;
+                    selectedMessageInConversation = null;
+                    displayCurrentConversation();
+                }
+            }
+        }
+        
+        function showDeleteModal() {
+            if (currentView === 'conversation' && !selectedMessageInConversation) {
+                alert('Please select a message in the conversation first');
+                return;
+            }
+            deleteModal.style.display = 'flex';
+        }
+        
+        function hideDeleteModal() {
+            deleteModal.style.display = 'none';
+        }
+        
+        function showDeleteConversationModal() {
+            deleteConversationModal.style.display = 'flex';
+        }
+        
+        function hideDeleteConversationModal() {
+            deleteConversationModal.style.display = 'none';
+        }
+        
+        // Function to open message in Outlook
+        function openInOutlook() {
+            if (currentView === 'single') {
+                if (filteredMessages.length === 0) return;
+                
+                const message = filteredMessages[currentIndex];
+                openMessageInOutlook(message);
+            } else {
+                // In conversation view, open the latest message or selected message
+                const filteredConversations = currentConversations.filter(conversation => {
+                    return conversation.messages.some(message => {
+                        const showKeep = showKeepCheckbox.checked;
+                        const showReview = showReviewCheckbox.checked;
+                        const showUntagged = showUntaggedCheckbox.checked;
+                        
+                        if (message.status === 'keep' && showKeep) return true;
+                        if (message.status === 'review' && showReview) return true;
+                        if (message.status === 'untagged' && showUntagged) return true;
+                        return false;
+                    });
+                });
+                
+                if (filteredConversations.length === 0) return;
+                
+                const conversation = filteredConversations[currentIndex];
+                let messageToOpen;
+                
+                if (selectedMessageInConversation) {
+                    // Open the selected message in conversation
+                    messageToOpen = conversation.messages.find(msg => msg.id === selectedMessageInConversation);
+                } else {
+                    // Open the latest message in conversation
+                    messageToOpen = conversation.messages[0];
+                }
+                
+                if (messageToOpen) {
+                    openMessageInOutlook(messageToOpen);
+                }
+            }
+        }
+
+        function openMessageInOutlook(message) {
+            // Extract the original filename from the message ID
+            const originalFilename = message.id.replace(`${currentProcess}_`, "") + '.msg';
+            
+            // Construct the full file path
+            const filePath = `msg_files/${currentProcess}/${originalFilename}`;
+            
+            // Create a file URL - this will work if the files are served locally
+            const fileUrl = `file:///${encodeURI(filePath)}`;
+            
+            try {
+                // Try to open the file with the default application (Outlook for .msg files)
+                const link = document.createElement('a');
+                link.href = fileUrl;
+                link.download = originalFilename;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                console.log(`Attempting to open: ${filePath}`);
+                showCopyIndicator('Opening in Outlook...');
+            } catch (error) {
+                console.error('Error opening file in Outlook:', error);
+                
+                // Fallback: Show the file path for manual opening
+                const fullPath = `${window.location.origin}/${filePath}`;
+                showCopyIndicator(`Cannot open automatically. File location: ${filePath}`);
+                
+                // Copy the file path to clipboard for manual use
+                navigator.clipboard.writeText(filePath).then(() => {
+                    setTimeout(() => {
+                        showCopyIndicator('File path copied to clipboard. You can open it manually in Outlook.');
+                    }, 2000);
+                });
+            }
+        }
+        
+        // Updated comment modal functions
+        function showCommentModal() {
+            if (currentView === 'conversation' && !selectedMessageInConversation) {
+                alert('Please select a message in the conversation first');
+                return;
+            }
+            
+            // Reset the form
+            currentLabels = [];
+            commentKeyIds.innerHTML = '<option value="">-- Select a Key ID --</option>';
+            commentKeyLabel.value = '';
+            commentLabels.value = '';
+            commentText.value = '';
+            updateLabelsDisplay();
+            
+            // Clear validation errors
+            clearValidationErrors();
+            
+            // Load key IDs from CSV
+            loadKeyIdsFromCSV();
+            
+            commentModal.style.display = 'flex';
+            
+            // Focus on first field
+            setTimeout(() => {
+                commentKeyIds.focus();
+            }, 100);
+        }
+
+        function loadKeyIdsFromCSV() {
+            // In a real application, this would fetch from a server endpoint
+            // For demo purposes, we'll use a simulated CSV response
+            const simulatedCSV = `ID1,ID2,ID3,ID4,ID5,ID6,ID7,ID8,ID9,ID10
+PROJ001,PROJ002,PROJ003,PROJ004,PROJ005
+DOC001,DOC002,DOC003,DOC004
+USER001,USER002,USER003`;
+            
+            // Parse CSV
+            const lines = simulatedCSV.split('\n');
+            validKeyIds = [];
+            
+            lines.forEach(line => {
+                const ids = line.split(',').map(id => id.trim()).filter(id => id);
+                validKeyIds.push(...ids);
+            });
+            
+            // Remove duplicates
+            validKeyIds = [...new Set(validKeyIds)];
+            
+            // Populate the dropdown
+            validKeyIds.forEach(keyId => {
+                const option = document.createElement('option');
+                option.value = keyId;
+                option.textContent = keyId;
+                commentKeyIds.appendChild(option);
+            });
+            
+            updateKeyIdPreview();
+        }
+
+        function validateCommentForm() {
+            let isValid = true;
+            
+            // Validate Key ID
+            const keyId = commentKeyIds.value.trim();
+            if (!keyId) {
+                document.getElementById('key-id-group').classList.add('error');
+                isValid = false;
+            } else {
+                document.getElementById('key-id-group').classList.remove('error');
+            }
+            
+            // Validate Key Label
+            const keyLabel = commentKeyLabel.value.trim();
+            if (!keyLabel) {
+                document.getElementById('key-label-group').classList.add('error');
+                isValid = false;
+            } else {
+                document.getElementById('key-label-group').classList.remove('error');
+            }
+            
+            return isValid;
+        }
+
+        function clearValidationErrors() {
+            document.getElementById('key-id-group').classList.remove('error');
+            document.getElementById('key-label-group').classList.remove('error');
+        }
+
+        function hideCommentModal() {
+            commentModal.style.display = 'none';
+        }
+        
+        function updateKeyIdPreview() {
+            const selectedId = commentKeyIds.value;
+            
+            if (selectedId) {
+                keyIdPreview.textContent = `Selected: ${selectedId}`;
+            } else {
+                keyIdPreview.textContent = 'No ID selected';
+            }
+        }
+        
+        function updateLabelPreview() {
+            const labelValue = commentKeyLabel.value;
+            const transformedLabel = transformLabel(labelValue);
+            
+            if (labelValue) {
+                labelPreview.textContent = `Will be saved as: ${transformedLabel}`;
+            } else {
+                labelPreview.textContent = 'Enter a label to see transformation';
+            }
+        }
+        
+        function transformLabel(label) {
+            // Convert to uppercase and remove special characters
+            return label.toUpperCase().replace(/[^A-Z0-9_]/g, '');
+        }
+        
+        function addLabel() {
+            const labelText = commentLabels.value.trim();
+            if (labelText) {
+                // Split by commas and trim each label
+                const labels = labelText.split(',').map(l => l.trim()).filter(l => l);
+                currentLabels.push(...labels);
+                commentLabels.value = '';
+                updateLabelsDisplay();
+            }
+        }
+        
+        function updateLabelsDisplay() {
+            labelsDisplay.innerHTML = '';
+            currentLabels.forEach((label, index) => {
+                const labelTag = document.createElement('div');
+                labelTag.className = 'label-tag';
+                labelTag.innerHTML = `
+                    ${label}
+                    <button class="remove-label" data-index="${index}">×</button>
+                `;
+                labelsDisplay.appendChild(labelTag);
+            });
+            
+            // Add event listeners to remove buttons
+            document.querySelectorAll('.remove-label').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const index = parseInt(e.target.dataset.index);
+                    currentLabels.splice(index, 1);
+                    updateLabelsDisplay();
+                });
+            });
+        }
+        
+        async function addComment() {
+            // Validate form
+            if (!validateCommentForm()) {
+                showError('Please fill in all mandatory fields');
+                return;
+            }
+
+            const commentTextValue = commentText.value.trim();
+            const keyId = commentKeyIds.value.trim();
+            const keyLabelValue = commentKeyLabel.value.trim();
+            
+            const transformedLabel = transformLabel(keyLabelValue);
+            
+            // Get current message info for comment formatting
+            let messageSubject = '';
+            let messageDate = '';
+            
+            if (currentView === 'single') {
+                if (filteredMessages.length > 0) {
+                    const currentMessage = filteredMessages[currentIndex];
+                    messageSubject = currentMessage.subject;
+                    messageDate = currentMessage.date;
+                }
+            } else {
+                if (selectedMessageInConversation) {
+                    const message = currentMessages.find(m => m.id === selectedMessageInConversation);
+                    if (message) {
+                        messageSubject = message.subject;
+                        messageDate = message.date;
+                    }
+                }
+            }
+            
+            const comment = {
+                key: {
+                    ids: [keyId],
+                    label: transformedLabel
+                },
+                labels: [...currentLabels],
+                text: commentTextValue,
+                date: new Date().toISOString(),
+                message_subject: messageSubject,  // Added for comment formatting
+                message_date: messageDate         // Added for comment formatting
+            };
+            
+            try {
+                // Send comment to backend
+                const messageId = currentView === 'single' ? 
+                    filteredMessages[currentIndex].id : selectedMessageInConversation;
+                
+                const response = await fetch(`${API_BASE_URL}/message/${currentProcess}/${messageId}/comment`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(comment)
+                });
+                
+                if (response.ok) {
+                    // Add this comment to the current message
+                    if (currentView === 'single') {
+                        const message = filteredMessages[currentIndex];
+                        if (!message.comments) message.comments = [];
+                        message.comments.push(comment);
+                        displayCurrentMessage();
+                    } else {
+                        // In conversation view, we are adding to the selected message in the conversation
+                        if (selectedMessageInConversation) {
+                            const message = currentMessages.find(m => m.id === selectedMessageInConversation);
+                            if (!message.comments) message.comments = [];
+                            message.comments.push(comment);
+                            displayCurrentConversation();
+                        }
+                    }
+                    
+                    // Reset the form
+                    currentLabels = [];
+                    commentKeyIds.value = '';
+                    commentKeyLabel.value = '';
+                    commentLabels.value = '';
+                    commentText.value = '';
+                    updateLabelsDisplay();
+                    updateKeyIdPreview();
+                    updateLabelPreview();
+                    clearValidationErrors();
+                    
+                    console.log('Comment added successfully');
+                    hideCommentModal();
+                } else {
+                    throw new Error('Failed to add comment');
+                }
+            } catch (error) {
+                console.error('Error adding comment:', error);
+                alert('Error adding comment. Please try again.');
+            }
+        }
+        
+        function copyContent() {
+            if (currentView === 'single') {
+                if (filteredMessages.length === 0) return;
+                
+                const message = filteredMessages[currentIndex];
+                copyMessageContent(message);
+            } else {
+                const filteredConversations = currentConversations.filter(conversation => {
+                    return conversation.messages.some(message => {
+                        const showKeep = showKeepCheckbox.checked;
+                        const showReview = showReviewCheckbox.checked;
+                        const showUntagged = showUntaggedCheckbox.checked;
+                        
+                        if (message.status === 'keep' && showKeep) return true;
+                        if (message.status === 'review' && showReview) return true;
+                        if (message.status === 'untagged' && showUntagged) return true;
+                        return false;
+                    });
+                });
+                
+                if (filteredConversations.length === 0) return;
+                
+                const conversation = filteredConversations[currentIndex];
+                copyConversationContent(conversation);
+            }
+        }
+        
+        function copyMessageContent(message) {
+            let textToCopy = `Subject: ${message.subject}\n`;
+            textToCopy += `From: ${message.from}\n`;
+            textToCopy += `To: ${message.to}\n`;
+            textToCopy += `Date: ${formatFullDate(new Date(message.date))}\n\n`;
+            textToCopy += `Body:\n${message.body}\n\n`;
+            
+            if (message.attachments && message.attachments.length > 0) {
+                textToCopy += `Attachments:\n`;
+                message.attachments.forEach(attachment => {
+                    textToCopy += `- ${attachment.name}\n`;
+                });
+                textToCopy += `\n`;
+            }
+            
+            if (message.comments && message.comments.length > 0) {
+                textToCopy += `Comments:\n`;
+                message.comments.forEach(comment => {
+                    const keyTitle = comment.key ? `${comment.key.ids.join(', ')} - ${comment.key.label}` : '';
+                    textToCopy += `- ${keyTitle}: ${comment.text}\n`;
+                });
+            }
+            
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showCopyIndicator();
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+            });
+        }
+        
+        function copyConversationContent(conversation) {
+            let textToCopy = `Conversation: ${conversation.subject}\n\n`;
+            
+            conversation.messages.forEach((message, index) => {
+                textToCopy += `Message ${index + 1}:\n`;
+                textToCopy += `Subject: ${message.subject}\n`;
+                textToCopy += `From: ${message.from}\n`;
+                textToCopy += `To: ${message.to}\n`;
+                textToCopy += `Date: ${formatFullDate(new Date(message.date))}\n\n`;
+                textToCopy += `Body:\n${message.body}\n\n`;
+                
+                if (message.attachments && message.attachments.length > 0) {
+                    textToCopy += `Attachments:\n`;
+                    message.attachments.forEach(attachment => {
+                        textToCopy += `- ${attachment.name}\n`;
+                    });
+                    textToCopy += `\n`;
+                }
+                
+                if (message.comments && message.comments.length > 0) {
+                    textToCopy += `Comments:\n`;
+                    message.comments.forEach(comment => {
+                        const keyTitle = comment.key ? `${comment.key.ids.join(', ')} - ${comment.key.label}` : '';
+                        textToCopy += `- ${keyTitle}: ${comment.text}\n`;
+                    });
+                    textToCopy += `\n`;
+                }
+                
+                textToCopy += `---\n\n`;
+            });
+            
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showCopyIndicator();
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+            });
+        }
+        
+        function showCopyIndicator(message = 'Copied to clipboard!') {
+            copyIndicator.textContent = message;
+            copyIndicator.classList.add('show');
+            
+            // Adjust timeout based on message length
+            const timeout = message.length > 50 ? 4000 : 2000;
+            
+            setTimeout(() => {
+                copyIndicator.classList.remove('show');
+            }, timeout);
+        }
+        
+        function deleteCurrentMessage() {
+            if (deleteMode === 'single') {
+                if (currentView === 'single') {
+                    if (filteredMessages.length === 0) return;
+                    
+                    const messageId = filteredMessages[currentIndex].id;
+                    deleteMessageById(messageId);
+                } else {
+                    if (selectedMessageInConversation) {
+                        deleteMessageById(selectedMessageInConversation);
+                    }
+                }
+                hideDeleteModal();
+            } else if (deleteMode === 'conversation') {
+                if (currentThreadId) {
+                    deleteConversationById(currentThreadId);
+                }
+                hideDeleteConversationModal();
+            }
+        }
+        
+        function deleteCurrentConversation() {
+            if (currentThreadId) {
+                deleteConversationById(currentThreadId);
+            }
+            hideDeleteConversationModal();
+        }
+        
+        function deleteMessageById(messageId) {
+            // Find the message index in currentMessages
+            const messageIndex = currentMessages.findIndex(msg => msg.id === messageId);
+            if (messageIndex !== -1) {
+                // Remove the message from currentMessages
+                currentMessages.splice(messageIndex, 1);
+                
+                // Update the display
+                applyFilters();
+                
+                console.log(`Message ${messageId} deleted`);
+            } else {
+                console.error(`Message ${messageId} not found`);
+            }
+        }
+        
+        function deleteConversationById(threadId) {
+            // Find all messages with this threadId
+            const messagesToDelete = currentMessages.filter(msg => msg.threadId === threadId);
+            
+            // Remove each message from currentMessages
+            messagesToDelete.forEach(message => {
+                const messageIndex = currentMessages.findIndex(msg => msg.id === message.id);
+                if (messageIndex !== -1) {
+                    currentMessages.splice(messageIndex, 1);
+                    console.log(`Message ${message.id} deleted`);
+                }
+            });
+            
+            // Also remove the conversation from currentConversations
+            const conversationIndex = currentConversations.findIndex(conv => conv.threadId === threadId);
+            if (conversationIndex !== -1) {
+                currentConversations.splice(conversationIndex, 1);
+            }
+            
+            // Update the display
+            applyFilters();
+            
+            console.log(`All messages in conversation ${threadId} deleted`);
+        }
+        
+        async function markAsKeep() {
+            if (currentView === 'single') {
+                if (filteredMessages.length === 0) return;
+                
+                const messageId = filteredMessages[currentIndex].id;
+                await markSingleMessageAsKeep(messageId);
+            } else {
+                if (selectedMessageInConversation) {
+                    await markSingleMessageAsKeep(selectedMessageInConversation);
+                }
+            }
+        }
+        
+        async function markSingleMessageAsKeep(messageId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/message/${currentProcess}/${messageId}/status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status: 'keep' })
+                });
+                
+                if (response.ok) {
+                    const message = currentMessages.find(msg => msg.id === messageId);
+                    
+                    if (message) {
+                        message.status = 'keep';
+                        
+                        if (currentView === 'single') {
+                            displayCurrentMessage();
+                        } else {
+                            displayCurrentConversation();
+                        }
+                        
+                        console.log(`Message ${messageId} marked as "Keep"`);
+                    }
+                } else {
+                    throw new Error('Failed to update status');
+                }
+            } catch (error) {
+                console.error('Error updating status:', error);
+                alert('Error updating message status');
+            }
+        }
+        
+        function markAllMessagesInConversationAsKeep(threadId) {
+            const conversation = currentConversations.find(conv => conv.threadId === threadId);
+            
+            if (conversation) {
+                conversation.messages.forEach(message => {
+                    markSingleMessageAsKeep(message.id);
+                });
+                
+                console.log(`All messages in conversation marked as "Keep"`);
+            }
+        }
+        
+        async function markAsReview() {
+            if (currentView === 'single') {
+                if (filteredMessages.length === 0) return;
+                
+                const messageId = filteredMessages[currentIndex].id;
+                await markSingleMessageAsReview(messageId);
+            } else {
+                if (selectedMessageInConversation) {
+                    await markSingleMessageAsReview(selectedMessageInConversation);
+                }
+            }
+        }
+        
+        async function markSingleMessageAsReview(messageId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/message/${currentProcess}/${messageId}/status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status: 'review' })
+                });
+                
+                if (response.ok) {
+                    const message = currentMessages.find(msg => msg.id === messageId);
+                    
+                    if (message) {
+                        message.status = 'review';
+                        
+                        if (currentView === 'single') {
+                            displayCurrentMessage();
+                        } else {
+                            displayCurrentConversation();
+                        }
+                        
+                        console.log(`Message ${messageId} marked as "To Review"`);
+                    }
+                } else {
+                    throw new Error('Failed to update status');
+                }
+            } catch (error) {
+                console.error('Error updating status:', error);
+                alert('Error updating message status');
+            }
+        }
+        
+        function markAllMessagesInConversationAsReview(threadId) {
+            const conversation = currentConversations.find(conv => conv.threadId === threadId);
+            
+            if (conversation) {
+                conversation.messages.forEach(message => {
+                    markSingleMessageAsReview(message.id);
+                });
+                
+                console.log(`All messages in conversation marked as "To Review"`);
+            }
+        }
+        
+        function getStatusText(status) {
+            switch(status) {
+                case 'keep': return 'Keep';
+                case 'review': return 'To Review';
+                default: return 'Untagged';
+            }
+        }
+        
+        function formatDate(date) {
+            return date.toLocaleDateString('en-US');
+        }
+        
+        function formatFullDate(date) {
+            return date.toLocaleString('en-US', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        // Load processes from API
+        async function loadProcesses() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/processes`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const processes = await response.json();
+                
+                // Update the process select dropdown
+                processSelect.innerHTML = '<option value="">-- Select a folder --</option>';
+                processes.forEach(process => {
+                    const option = document.createElement('option');
+                    option.value = process.id;
+                    option.textContent = `${process.name} (${process.count} messages)`;
+                    processSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading processes:', error);
+                showError('Cannot connect to backend server. Please make sure the Python backend is running on port 5000.');
+            }
+        }
+
+        // Add event listeners for form validation
+        commentKeyIds.addEventListener('change', function() {
+            if (this.value.trim()) {
+                document.getElementById('key-id-group').classList.remove('error');
+            }
+            updateKeyIdPreview();
+        });
+
+        commentKeyLabel.addEventListener('input', function() {
+            if (this.value.trim()) {
+                document.getElementById('key-label-group').classList.remove('error');
+            }
+            updateLabelPreview();
+        });
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadProcesses();
+            clearMessageDisplay();
+        });
+    </script>
+</body>
+</html>
