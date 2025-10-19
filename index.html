@@ -363,13 +363,11 @@
         
         .message-body-small {
             padding: 15px;
-            white-space: pre-wrap;
             line-height: 1.6;
             font-size: 14px;
         }
         
         .single-message-view .message-body {
-            white-space: pre-wrap;
             line-height: 1.6;
             font-size: 15px;
         }
@@ -1111,7 +1109,6 @@
             border: 1px solid #f5c6cb;
         }
 
-        /* Updated comment modal styles */
         .mandatory-field::after {
             content: " *";
             color: var(--danger-color);
@@ -1130,7 +1127,6 @@
             font-size: 0.85rem;
         }
 
-        /* Smart comment display styles */
         .comments-section-smart {
             margin-bottom: 20px;
             padding: 15px;
@@ -1295,7 +1291,6 @@
             color: var(--primary-darker);
         }
 
-        /* Validation styles */
         .form-group.error input,
         .form-group.error select {
             border-color: var(--danger-color);
@@ -1313,7 +1308,6 @@
             display: block;
         }
 
-        /* Empty comments state */
         .no-comments {
             text-align: center;
             padding: 20px;
@@ -1327,7 +1321,6 @@
             opacity: 0.5;
         }
 
-        /* Button tooltips */
         .tooltip {
             position: relative;
         }
@@ -1355,7 +1348,6 @@
             visibility: visible;
         }
 
-        /* Responsive adjustments */
         @media (max-width: 768px) {
             .comment-grid {
                 grid-template-columns: 1fr;
@@ -1381,6 +1373,32 @@
                 min-width: auto;
                 padding: 10px;
             }
+        }
+
+        .html-body {
+            max-width: 100%;
+            overflow-x: auto;
+        }
+        
+        .html-body table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 10px 0;
+        }
+        
+        .html-body table, .html-body th, .html-body td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        
+        .html-body th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        
+        .html-body img {
+            max-width: 100%;
+            height: auto;
         }
     </style>
 </head>
@@ -1492,7 +1510,7 @@
                     <button class="action-btn review-btn" id="review-btn">To Review</button>
                     <button class="action-btn comment-btn" id="comment-btn">Comment</button>
                     <button class="action-btn copy-btn" id="copy-btn">Copy</button>
-                    <button class="action-btn outlook-btn tooltip" id="outlook-btn" data-tooltip="Open in Outlook">
+                    <button class="action-btn outlook-btn tooltip" id="outlook-btn" data-tooltip="Download .msg file">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                             <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                             <polyline points="22,6 12,13 2,6"/>
@@ -1574,7 +1592,7 @@
     <div class="copy-indicator" id="copy-indicator">Copied to clipboard!</div>
 
     <script>
-        // API Configuration - CORRIGÉ
+        // API Configuration
         const API_BASE_URL = '/api';
 
         // Application state
@@ -1590,7 +1608,7 @@
         let currentLabels = [];
         let validKeyIds = [];
         
-        // DOM Elements - CORRIGÉ (suppression des doublons)
+        // DOM Elements
         const processSelect = document.getElementById('process-select');
         const messageList = document.getElementById('message-list');
         const conversationList = document.getElementById('conversation-list');
@@ -1722,27 +1740,24 @@
             }
         }
         
-        // New refresh function
         async function refreshData() {
-            // Add loading animation to refresh button
             refreshBtn.classList.add('loading');
             
             try {
+                // Refresh cache
+                await fetch(`${API_BASE_URL}/refresh-cache`, { method: 'POST' });
+                
                 if (currentProcess) {
-                    // If a process is selected, reload its messages
                     await handleProcessChange();
                 } else {
-                    // If no process is selected, reload the process list
                     await loadProcesses();
                 }
                 
-                // Show success feedback
                 showCopyIndicator('Data refreshed successfully!');
             } catch (error) {
                 console.error('Error refreshing data:', error);
                 showError('Error refreshing data');
             } finally {
-                // Remove loading animation
                 refreshBtn.classList.remove('loading');
             }
         }
@@ -1776,7 +1791,6 @@
         }
         
         function showError(message) {
-            // Remove any existing error messages
             const existingError = document.querySelector('.error-message');
             if (existingError) {
                 existingError.remove();
@@ -1786,11 +1800,9 @@
             errorDiv.className = 'error-message';
             errorDiv.textContent = message;
             
-            // Insert error at the top of the content area
             const contentArea = document.querySelector('.content-area');
             contentArea.insertBefore(errorDiv, contentArea.firstChild);
             
-            // Auto-remove after 5 seconds
             setTimeout(() => {
                 if (errorDiv.parentNode) {
                     errorDiv.remove();
@@ -1813,10 +1825,8 @@
                 threads[message.threadId].messages.push(message);
             });
             
-            // Sort messages in each thread by date (newest first)
             Object.values(threads).forEach(thread => {
                 thread.messages.sort((a, b) => new Date(b.date) - new Date(a.date));
-                // Update the conversation subject to the latest message's subject
                 if (thread.messages.length > 0) {
                     thread.subject = thread.messages[0].subject.replace(/^(RE:|FW:)\s*/i, '');
                 }
@@ -1824,7 +1834,6 @@
             
             currentConversations = Object.values(threads);
             
-            // Sort conversations by the date of the latest message (newest first)
             currentConversations.sort((a, b) => {
                 const dateA = new Date(a.messages[0].date);
                 const dateB = new Date(b.messages[0].date);
@@ -1837,7 +1846,6 @@
             const showReview = showReviewCheckbox.checked;
             const showUntagged = showUntaggedCheckbox.checked;
             
-            // Filter messages for single view
             filteredMessages = currentMessages.filter(message => {
                 if (message.status === 'keep' && showKeep) return true;
                 if (message.status === 'review' && showReview) return true;
@@ -1845,10 +1853,8 @@
                 return false;
             });
             
-            // Sort messages by date (newest first)
             filteredMessages.sort((a, b) => new Date(b.date) - new Date(a.date));
             
-            // Filter conversations for conversation view
             const filteredConversations = currentConversations.filter(conversation => {
                 return conversation.messages.some(message => {
                     if (message.status === 'keep' && showKeep) return true;
@@ -1889,7 +1895,6 @@
                 singleMessageView.classList.remove('hidden');
                 conversationView.classList.add('hidden');
                 viewTypeIndicator.textContent = 'Message';
-                // Show the delete button in single view
                 deleteBtn.classList.remove('hidden');
                 applyFilters();
             } else {
@@ -1898,7 +1903,6 @@
                 singleMessageView.classList.add('hidden');
                 conversationView.classList.remove('hidden');
                 viewTypeIndicator.textContent = 'Conversation';
-                // Hide the delete button in conversation view
                 deleteBtn.classList.add('hidden');
                 applyFilters();
             }
@@ -1926,15 +1930,12 @@
                 const statusClass = `status-badge status-${message.status}`;
                 const statusText = getStatusText(message.status);
                 
-                // Create a content preview (first 60 characters)
                 const preview = message.body.length > 60 ? 
                     message.body.substring(0, 60) + '...' : message.body;
                 
-                // Check if message contains a thread
                 const threadIndicator = message.containsThread ? 
                     '<span class="thread-indicator">Contains Thread</span>' : '';
                 
-                // Check if message has multiple threads
                 const multiThreadIndicator = message.subThreads && message.subThreads.length > 0 ?
                     '<span class="multi-thread-indicator">Multiple Threads</span>' : '';
                 
@@ -1950,7 +1951,7 @@
                 messageItem.addEventListener('click', () => {
                     currentIndex = index;
                     displayCurrentMessage();
-                    renderMessageList(); // To update the active class
+                    renderMessageList();
                 });
                 
                 messageList.appendChild(messageItem);
@@ -1976,15 +1977,12 @@
                 conversationItem.className = `conversation-item ${index === currentIndex ? 'active' : ''}`;
                 conversationItem.dataset.index = index;
                 
-                // Use the latest message in the conversation
                 const latestMessage = conversation.messages[0];
                 
-                // Check if any message in the conversation contains a thread
                 const hasThread = conversation.messages.some(msg => msg.containsThread);
                 const threadIndicator = hasThread ? 
                     '<span class="thread-indicator">Contains Threads</span>' : '';
                 
-                // Check if conversation has multiple threads
                 const multiThreadIndicator = conversation.hasMultipleThreads ?
                     '<span class="multi-thread-indicator">Multiple Threads</span>' : '';
                 
@@ -2001,7 +1999,7 @@
                     currentThreadId = conversation.threadId;
                     selectedMessageInConversation = null;
                     displayCurrentConversation();
-                    renderConversationList(conversations); // To update the active class
+                    renderConversationList(conversations);
                 });
                 
                 conversationList.appendChild(conversationItem);
@@ -2016,21 +2014,17 @@
             
             const message = filteredMessages[currentIndex];
             
-            // Update the interface
             messageSubject.textContent = message.subject;
             messageFrom.textContent = message.from;
             
-            // Format recipients for display
             const formattedRecipients = formatRecipients(message.to);
             messageTo.innerHTML = formattedRecipients;
             
-            // Add tooltip for multiple recipients
             setupRecipientsTooltip(messageTo, message.to);
             
             const dateObj = new Date(message.date);
             messageDate.textContent = formatFullDate(dateObj);
             
-            // Add attachments to header if they exist
             if (message.attachments && message.attachments.length > 0) {
                 const attachmentsHtml = createAttachmentsHeaderHtml(message.attachments);
                 messageAttachmentsHeader.innerHTML = attachmentsHtml;
@@ -2038,7 +2032,6 @@
                 messageAttachmentsHeader.innerHTML = '';
             }
             
-            // Add comments if they exist (using new smart display)
             if (message.comments && message.comments.length > 0) {
                 const commentsHtml = createCommentsHtml(message.comments);
                 messageComments.innerHTML = commentsHtml;
@@ -2046,26 +2039,22 @@
                 messageComments.innerHTML = '';
             }
             
-            // Check if message contains a thread and format accordingly
-            if (message.containsThread) {
-                messageBody.innerHTML = formatEmailThread(message.body);
+            // Handle different body types
+            if (message.body_type === 'html') {
+                messageBody.innerHTML = `<div class="html-body">${message.body}</div>`;
             } else {
-                messageBody.innerHTML = `<div class="message-body">${message.body}</div>`;
+                messageBody.innerHTML = `<div class="message-body" style="white-space: pre-wrap;">${message.body}</div>`;
             }
             
-            // Update the status
             const statusText = getStatusText(message.status);
             messageStatus.textContent = statusText;
             
-            // Update the counter
             currentIndexSpan.textContent = currentIndex + 1;
             totalCountSpan.textContent = filteredMessages.length;
             
-            // Enable/disable navigation buttons
             prevBtn.disabled = currentIndex === 0;
             nextBtn.disabled = currentIndex === filteredMessages.length - 1;
             
-            // Update the list to reflect the active item
             if (currentView === 'single') {
                 renderMessageList();
             }
@@ -2079,7 +2068,6 @@
             `;
             
             attachments.forEach(attachment => {
-                // Use the backend URL for attachments
                 const attachmentUrl = `${API_BASE_URL}${attachment.url}`;
                 html += `
                     <div class="attachment-item">
@@ -2167,7 +2155,6 @@
             return html;
         }
 
-        // New function to toggle comment expansion
         function toggleCommentExpand(commentIndex) {
             const commentCard = document.querySelector(`[data-comment-index="${commentIndex}"]`);
             const commentText = commentCard.querySelector('.comment-text-smart');
@@ -2184,7 +2171,6 @@
             }
         }
 
-        // Helper function for relative time
         function formatRelativeTime(date) {
             const now = new Date();
             const diffInSeconds = Math.floor((now - date) / 1000);
@@ -2214,7 +2200,6 @@
                 return;
             }
             
-            // Create tooltip if it doesn't exist
             let tooltip = element.querySelector('.recipients-tooltip');
             if (!tooltip) {
                 tooltip = document.createElement('div');
@@ -2230,7 +2215,6 @@
                 tooltip.appendChild(list);
                 element.appendChild(tooltip);
                 
-                // Add event listeners to show/hide tooltip
                 const summary = element.querySelector('.recipients-summary');
                 summary.addEventListener('mouseenter', () => {
                     tooltip.classList.add('show');
@@ -2239,108 +2223,6 @@
                 summary.addEventListener('mouseleave', () => {
                     tooltip.classList.remove('show');
                 });
-            }
-        }
-        
-        function formatEmailThread(body) {
-            // Simple heuristic to detect email threads
-            const threadSeparators = [
-                '------------------------',
-                '-----------------------',
-                '________________________',
-                'From:',
-                'Sent:',
-                'To:',
-                'Subject:',
-                'On',
-                'wrote:'
-            ];
-            
-            let formattedBody = `<div class="message-body">`;
-            let inThread = false;
-            let threadCount = 0;
-            
-            const lines = body.split('\n');
-            let currentThread = '';
-            
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                
-                // Check if this line indicates the start of a thread
-                const isThreadStart = threadSeparators.some(separator => 
-                    line.trim().startsWith(separator) || 
-                    (i > 0 && lines[i-1].trim() === '' && line.includes('From:'))
-                );
-                
-                if (isThreadStart && !inThread) {
-                    // If we were building a thread, add it now
-                    if (currentThread) {
-                        formattedBody += createThreadElement(currentThread, threadCount);
-                        threadCount++;
-                        currentThread = '';
-                    }
-                    
-                    inThread = true;
-                    currentThread += line + '\n';
-                } else if (inThread) {
-                    currentThread += line + '\n';
-                    
-                    // Check if we've reached the end of the thread (empty line followed by non-thread content)
-                    if (line.trim() === '' && i < lines.length - 1) {
-                        const nextLine = lines[i+1];
-                        const isNextLineThread = threadSeparators.some(separator => 
-                            nextLine.trim().startsWith(separator)
-                        );
-                        
-                        if (!isNextLineThread) {
-                            formattedBody += createThreadElement(currentThread, threadCount);
-                            threadCount++;
-                            currentThread = '';
-                            inThread = false;
-                        }
-                    }
-                } else {
-                    // This is the main message content
-                    formattedBody += line + '\n';
-                }
-            }
-            
-            // Add any remaining thread
-            if (currentThread) {
-                formattedBody += createThreadElement(currentThread, threadCount);
-            }
-            
-            formattedBody += `</div>`;
-            return formattedBody;
-        }
-        
-        function createThreadElement(threadContent, index) {
-            const threadId = `thread-${index}`;
-            return `
-                <div class="email-thread">
-                    <div class="email-thread-header" onclick="toggleThread('${threadId}')">
-                        <span class="expand-icon">▶</span>
-                        Previous Email Exchange
-                    </div>
-                    <div class="email-thread-content collapsed" id="${threadId}">
-                        <div class="email-thread-meta">This email contains previous exchanges where you were not initially included</div>
-                        <pre>${threadContent}</pre>
-                    </div>
-                </div>
-            `;
-        }
-        
-        function toggleThread(threadId) {
-            const threadElement = document.getElementById(threadId);
-            const header = threadElement.previousElementSibling;
-            const icon = header.querySelector('.expand-icon');
-            
-            if (threadElement.classList.contains('collapsed')) {
-                threadElement.classList.remove('collapsed');
-                icon.textContent = '▼';
-            } else {
-                threadElement.classList.add('collapsed');
-                icon.textContent = '▶';
             }
         }
         
@@ -2366,21 +2248,17 @@
             const conversation = filteredConversations[currentIndex];
             const latestMessage = conversation.messages[0];
             
-            // Update the interface with the latest message's information
             messageSubject.textContent = latestMessage.subject;
             messageFrom.textContent = latestMessage.from;
             
-            // Format recipients for display
             const formattedRecipients = formatRecipients(latestMessage.to);
             messageTo.innerHTML = formattedRecipients;
             
-            // Add tooltip for multiple recipients
             setupRecipientsTooltip(messageTo, latestMessage.to);
             
             messageDate.textContent = formatFullDate(new Date(latestMessage.date));
             messageStatus.textContent = getStatusText(latestMessage.status);
             
-            // Add attachments to header if they exist
             if (latestMessage.attachments && latestMessage.attachments.length > 0) {
                 const attachmentsHtml = createAttachmentsHeaderHtml(latestMessage.attachments);
                 messageAttachmentsHeader.innerHTML = attachmentsHtml;
@@ -2388,7 +2266,6 @@
                 messageAttachmentsHeader.innerHTML = '';
             }
             
-            // Display all messages in the conversation
             conversationView.innerHTML = '';
             
             conversation.messages.forEach((message, index) => {
@@ -2399,11 +2276,9 @@
                 const statusClass = `status-badge status-${message.status}`;
                 const statusText = getStatusText(message.status);
                 
-                // Check if message contains a thread
                 const threadIndicator = message.containsThread ? 
                     '<span class="thread-indicator">Contains Thread</span>' : '';
                 
-                // Format recipients for display in conversation view
                 const formattedRecipients = formatRecipients(message.to);
                 
                 messageElement.innerHTML = `
@@ -2445,7 +2320,7 @@
                                     <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
                                 </svg>
                             </button>
-                            <button class="action-btn-small outlook-btn-small tooltip" data-message-id="${message.id}" data-tooltip="Open in Outlook">
+                            <button class="action-btn-small outlook-btn-small tooltip" data-message-id="${message.id}" data-tooltip="Download .msg">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                                     <polyline points="22,6 12,13 2,6"/>
@@ -2455,44 +2330,37 @@
                     </div>
                     <div class="message-body-small">
                         ${message.comments && message.comments.length > 0 ? createCommentsHtml(message.comments) : ''}
-                        ${message.containsThread ? formatEmailThread(message.body) : message.body}
+                        ${message.body_type === 'html' ? 
+                            `<div class="html-body">${message.body}</div>` : 
+                            `<div style="white-space: pre-wrap;">${message.body}</div>`}
                         ${message.attachments && message.attachments.length > 0 ? createAttachmentsHtml(message.attachments) : ''}
                     </div>
                 `;
                 
-                // Add tooltip for multiple recipients in conversation view
                 const recipientsElement = messageElement.querySelector('.recipients-list');
                 setupRecipientsTooltip(recipientsElement, message.to);
                 
-                // Add click handler to select individual message in conversation
                 const header = messageElement.querySelector('.message-header-small');
                 header.addEventListener('click', (e) => {
-                    // Don't trigger if clicking on action buttons
                     if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
                     
-                    // Remove active class from all messages
                     document.querySelectorAll('.conversation-message').forEach(msg => {
                         msg.classList.remove('active');
                     });
-                    // Add active class to clicked message
                     messageElement.classList.add('active');
                     selectedMessageInConversation = message.id;
                     
-                    // Update the main header with this message's info
                     messageSubject.textContent = message.subject;
                     messageFrom.textContent = message.from;
                     
-                    // Format recipients for display
                     const formattedRecipients = formatRecipients(message.to);
                     messageTo.innerHTML = formattedRecipients;
                     
-                    // Add tooltip for multiple recipients
                     setupRecipientsTooltip(messageTo, message.to);
                     
                     messageDate.textContent = formatFullDate(new Date(message.date));
                     messageStatus.textContent = getStatusText(message.status);
                     
-                    // Update attachments in header
                     if (message.attachments && message.attachments.length > 0) {
                         const attachmentsHtml = createAttachmentsHeaderHtml(message.attachments);
                         messageAttachmentsHeader.innerHTML = attachmentsHtml;
@@ -2501,7 +2369,6 @@
                     }
                 });
                 
-                // Add event listeners for individual message action buttons
                 const deleteBtnSmall = messageElement.querySelector('.delete-btn-small');
                 const keepBtnSmall = messageElement.querySelector('.keep-btn-small');
                 const reviewBtnSmall = messageElement.querySelector('.review-btn-small');
@@ -2545,7 +2412,6 @@
                 conversationView.appendChild(messageElement);
             });
             
-            // Add conversation-level actions
             const conversationActions = document.createElement('div');
             conversationActions.className = 'conversation-actions';
             conversationActions.innerHTML = `
@@ -2553,7 +2419,7 @@
                 <button class="conversation-action-btn conversation-review-btn">Mark All for Review</button>
                 <button class="conversation-action-btn conversation-delete-btn">Delete All Messages</button>
                 <button class="conversation-action-btn conversation-copy-btn">Copy Conversation</button>
-                <button class="conversation-action-btn conversation-outlook-btn tooltip" data-tooltip="Open Latest in Outlook">
+                <button class="conversation-action-btn conversation-outlook-btn tooltip" data-tooltip="Download Latest .msg">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                         <polyline points="22,6 12,13 2,6"/>
@@ -2588,15 +2454,12 @@
             
             conversationView.appendChild(conversationActions);
             
-            // Update the counter
             currentIndexSpan.textContent = currentIndex + 1;
             totalCountSpan.textContent = filteredConversations.length;
             
-            // Enable/disable navigation buttons
             prevBtn.disabled = currentIndex === 0;
             nextBtn.disabled = currentIndex === filteredConversations.length - 1;
             
-            // Update the list to reflect the active item
             renderConversationList(filteredConversations);
         }
         
@@ -2608,7 +2471,6 @@
             `;
             
             attachments.forEach(attachment => {
-                // Use the backend URL for attachments
                 const attachmentUrl = `${API_BASE_URL}${attachment.url}`;
                 html += `
                     <div class="attachment-item">
@@ -2746,7 +2608,6 @@
             deleteConversationModal.style.display = 'none';
         }
         
-        // Function to open message in Outlook
         function openInOutlook() {
             if (currentView === 'single') {
                 if (filteredMessages.length === 0) return;
@@ -2754,7 +2615,6 @@
                 const message = filteredMessages[currentIndex];
                 openMessageInOutlook(message);
             } else {
-                // In conversation view, open the latest message or selected message
                 const filteredConversations = currentConversations.filter(conversation => {
                     return conversation.messages.some(message => {
                         const showKeep = showKeepCheckbox.checked;
@@ -2774,10 +2634,8 @@
                 let messageToOpen;
                 
                 if (selectedMessageInConversation) {
-                    // Open the selected message in conversation
                     messageToOpen = conversation.messages.find(msg => msg.id === selectedMessageInConversation);
                 } else {
-                    // Open the latest message in conversation
                     messageToOpen = conversation.messages[0];
                 }
                 
@@ -2788,51 +2646,26 @@
         }
 
         function openMessageInOutlook(message) {
-            // Extract the original filename from the message ID
-            const originalFilename = message.id.replace(`${currentProcess}_`, "") + '.msg';
+            // Create download link for .msg file
+            const downloadUrl = `${API_BASE_URL}/attachment/${currentProcess}/${message.id}/0`;
             
-            // Construct the full file path
-            const filePath = `msg_files/${currentProcess}/${originalFilename}`;
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = message.filename || 'message.msg';
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
             
-            // Create a file URL - this will work if the files are served locally
-            const fileUrl = `file:///${encodeURI(filePath)}`;
-            
-            try {
-                // Try to open the file with the default application (Outlook for .msg files)
-                const link = document.createElement('a');
-                link.href = fileUrl;
-                link.download = originalFilename;
-                link.style.display = 'none';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                console.log(`Attempting to open: ${filePath}`);
-                showCopyIndicator('Opening in Outlook...');
-            } catch (error) {
-                console.error('Error opening file in Outlook:', error);
-                
-                // Fallback: Show the file path for manual opening
-                const fullPath = `${window.location.origin}/${filePath}`;
-                showCopyIndicator(`Cannot open automatically. File location: ${filePath}`);
-                
-                // Copy the file path to clipboard for manual use
-                navigator.clipboard.writeText(filePath).then(() => {
-                    setTimeout(() => {
-                        showCopyIndicator('File path copied to clipboard. You can open it manually in Outlook.');
-                    }, 2000);
-                });
-            }
+            showCopyIndicator('Downloading .msg file...');
         }
         
-        // Updated comment modal functions
         function showCommentModal() {
             if (currentView === 'conversation' && !selectedMessageInConversation) {
                 alert('Please select a message in the conversation first');
                 return;
             }
             
-            // Reset the form
             currentLabels = [];
             commentKeyIds.innerHTML = '<option value="">-- Select a Key ID --</option>';
             commentKeyLabel.value = '';
@@ -2840,29 +2673,23 @@
             commentText.value = '';
             updateLabelsDisplay();
             
-            // Clear validation errors
             clearValidationErrors();
             
-            // Load key IDs from CSV
             loadKeyIdsFromCSV();
             
             commentModal.style.display = 'flex';
             
-            // Focus on first field
             setTimeout(() => {
                 commentKeyIds.focus();
             }, 100);
         }
 
         function loadKeyIdsFromCSV() {
-            // In a real application, this would fetch from a server endpoint
-            // For demo purposes, we'll use a simulated CSV response
             const simulatedCSV = `ID1,ID2,ID3,ID4,ID5,ID6,ID7,ID8,ID9,ID10
 PROJ001,PROJ002,PROJ003,PROJ004,PROJ005
 DOC001,DOC002,DOC003,DOC004
 USER001,USER002,USER003`;
             
-            // Parse CSV
             const lines = simulatedCSV.split('\n');
             validKeyIds = [];
             
@@ -2871,10 +2698,8 @@ USER001,USER002,USER003`;
                 validKeyIds.push(...ids);
             });
             
-            // Remove duplicates
             validKeyIds = [...new Set(validKeyIds)];
             
-            // Populate the dropdown
             validKeyIds.forEach(keyId => {
                 const option = document.createElement('option');
                 option.value = keyId;
@@ -2888,7 +2713,6 @@ USER001,USER002,USER003`;
         function validateCommentForm() {
             let isValid = true;
             
-            // Validate Key ID
             const keyId = commentKeyIds.value.trim();
             if (!keyId) {
                 document.getElementById('key-id-group').classList.add('error');
@@ -2897,7 +2721,6 @@ USER001,USER002,USER003`;
                 document.getElementById('key-id-group').classList.remove('error');
             }
             
-            // Validate Key Label
             const keyLabel = commentKeyLabel.value.trim();
             if (!keyLabel) {
                 document.getElementById('key-label-group').classList.add('error');
@@ -2940,14 +2763,12 @@ USER001,USER002,USER003`;
         }
         
         function transformLabel(label) {
-            // Convert to uppercase and remove special characters
             return label.toUpperCase().replace(/[^A-Z0-9_]/g, '');
         }
         
         function addLabel() {
             const labelText = commentLabels.value.trim();
             if (labelText) {
-                // Split by commas and trim each label
                 const labels = labelText.split(',').map(l => l.trim()).filter(l => l);
                 currentLabels.push(...labels);
                 commentLabels.value = '';
@@ -2967,7 +2788,6 @@ USER001,USER002,USER003`;
                 labelsDisplay.appendChild(labelTag);
             });
             
-            // Add event listeners to remove buttons
             document.querySelectorAll('.remove-label').forEach(button => {
                 button.addEventListener('click', (e) => {
                     const index = parseInt(e.target.dataset.index);
@@ -2978,7 +2798,6 @@ USER001,USER002,USER003`;
         }
         
         async function addComment() {
-            // Validate form
             if (!validateCommentForm()) {
                 showError('Please fill in all mandatory fields');
                 return;
@@ -2990,7 +2809,6 @@ USER001,USER002,USER003`;
             
             const transformedLabel = transformLabel(keyLabelValue);
             
-            // Get current message info for comment formatting
             let messageSubject = '';
             let messageDate = '';
             
@@ -3018,12 +2836,11 @@ USER001,USER002,USER003`;
                 labels: [...currentLabels],
                 text: commentTextValue,
                 date: new Date().toISOString(),
-                message_subject: messageSubject,  // Added for comment formatting
-                message_date: messageDate         // Added for comment formatting
+                message_subject: messageSubject,
+                message_date: messageDate
             };
             
             try {
-                // Send comment to backend
                 const messageId = currentView === 'single' ? 
                     filteredMessages[currentIndex].id : selectedMessageInConversation;
                 
@@ -3036,14 +2853,12 @@ USER001,USER002,USER003`;
                 });
                 
                 if (response.ok) {
-                    // Add this comment to the current message
                     if (currentView === 'single') {
                         const message = filteredMessages[currentIndex];
                         if (!message.comments) message.comments = [];
                         message.comments.push(comment);
                         displayCurrentMessage();
                     } else {
-                        // In conversation view, we are adding to the selected message in the conversation
                         if (selectedMessageInConversation) {
                             const message = currentMessages.find(m => m.id === selectedMessageInConversation);
                             if (!message.comments) message.comments = [];
@@ -3052,7 +2867,6 @@ USER001,USER002,USER003`;
                         }
                     }
                     
-                    // Reset the form
                     currentLabels = [];
                     commentKeyIds.value = '';
                     commentKeyLabel.value = '';
@@ -3106,7 +2920,10 @@ USER001,USER002,USER003`;
             textToCopy += `From: ${message.from}\n`;
             textToCopy += `To: ${message.to}\n`;
             textToCopy += `Date: ${formatFullDate(new Date(message.date))}\n\n`;
-            textToCopy += `Body:\n${message.body}\n\n`;
+            
+            // Strip HTML tags for plain text copy
+            const plainTextBody = message.body.replace(/<[^>]*>/g, '');
+            textToCopy += `Body:\n${plainTextBody}\n\n`;
             
             if (message.attachments && message.attachments.length > 0) {
                 textToCopy += `Attachments:\n`;
@@ -3140,7 +2957,9 @@ USER001,USER002,USER003`;
                 textToCopy += `From: ${message.from}\n`;
                 textToCopy += `To: ${message.to}\n`;
                 textToCopy += `Date: ${formatFullDate(new Date(message.date))}\n\n`;
-                textToCopy += `Body:\n${message.body}\n\n`;
+                
+                const plainTextBody = message.body.replace(/<[^>]*>/g, '');
+                textToCopy += `Body:\n${plainTextBody}\n\n`;
                 
                 if (message.attachments && message.attachments.length > 0) {
                     textToCopy += `Attachments:\n`;
@@ -3173,7 +2992,6 @@ USER001,USER002,USER003`;
             copyIndicator.textContent = message;
             copyIndicator.classList.add('show');
             
-            // Adjust timeout based on message length
             const timeout = message.length > 50 ? 4000 : 2000;
             
             setTimeout(() => {
@@ -3210,15 +3028,10 @@ USER001,USER002,USER003`;
         }
         
         function deleteMessageById(messageId) {
-            // Find the message index in currentMessages
             const messageIndex = currentMessages.findIndex(msg => msg.id === messageId);
             if (messageIndex !== -1) {
-                // Remove the message from currentMessages
                 currentMessages.splice(messageIndex, 1);
-                
-                // Update the display
                 applyFilters();
-                
                 console.log(`Message ${messageId} deleted`);
             } else {
                 console.error(`Message ${messageId} not found`);
@@ -3226,10 +3039,8 @@ USER001,USER002,USER003`;
         }
         
         function deleteConversationById(threadId) {
-            // Find all messages with this threadId
             const messagesToDelete = currentMessages.filter(msg => msg.threadId === threadId);
             
-            // Remove each message from currentMessages
             messagesToDelete.forEach(message => {
                 const messageIndex = currentMessages.findIndex(msg => msg.id === message.id);
                 if (messageIndex !== -1) {
@@ -3238,15 +3049,12 @@ USER001,USER002,USER003`;
                 }
             });
             
-            // Also remove the conversation from currentConversations
             const conversationIndex = currentConversations.findIndex(conv => conv.threadId === threadId);
             if (conversationIndex !== -1) {
                 currentConversations.splice(conversationIndex, 1);
             }
             
-            // Update the display
             applyFilters();
-            
             console.log(`All messages in conversation ${threadId} deleted`);
         }
         
@@ -3388,7 +3196,6 @@ USER001,USER002,USER003`;
             });
         }
         
-        // Load processes from API
         async function loadProcesses() {
             try {
                 const response = await fetch(`${API_BASE_URL}/processes`);
@@ -3397,7 +3204,6 @@ USER001,USER002,USER003`;
                 }
                 const processes = await response.json();
                 
-                // Update the process select dropdown
                 processSelect.innerHTML = '<option value="">-- Select a folder --</option>';
                 processes.forEach(process => {
                     const option = document.createElement('option');
@@ -3407,11 +3213,10 @@ USER001,USER002,USER003`;
                 });
             } catch (error) {
                 console.error('Error loading processes:', error);
-                showError('Cannot connect to backend server. Please make sure the Python backend is running on port 5000.');
+                showError('Cannot connect to backend server. Please make sure the Python backend is running on port 8000.');
             }
         }
 
-        // Add event listeners for form validation
         commentKeyIds.addEventListener('change', function() {
             if (this.value.trim()) {
                 document.getElementById('key-id-group').classList.remove('error');
@@ -3426,7 +3231,6 @@ USER001,USER002,USER003`;
             updateLabelPreview();
         });
         
-        // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadProcesses();
             clearMessageDisplay();
