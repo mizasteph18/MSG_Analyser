@@ -13,6 +13,7 @@ from urllib.parse import urlparse, parse_qs
 import html
 import time
 from functools import lru_cache
+import traceback
 
 class MSGAnalyzer:
     def __init__(self, base_folder="msg_files"):
@@ -32,6 +33,10 @@ class MSGAnalyzer:
     def get_processes(self):
         processes = []
         try:
+            if not os.path.exists(self.base_folder):
+                self._ensure_base_folder()
+                return self._create_sample_structure()
+                
             for item in os.listdir(self.base_folder):
                 item_path = os.path.join(self.base_folder, item)
                 if os.path.isdir(item_path):
@@ -43,10 +48,10 @@ class MSGAnalyzer:
                     })
         except Exception as e:
             print(f"Error reading processes: {e}")
+            traceback.print_exc()
         
         if not processes:
-            self._create_sample_structure()
-            return self.get_processes()
+            return self._create_sample_structure()
         
         return processes
     
@@ -55,7 +60,12 @@ class MSGAnalyzer:
         for folder in sample_folders:
             folder_path = os.path.join(self.base_folder, folder)
             os.makedirs(folder_path, exist_ok=True)
+            # Create a README file in each folder
+            with open(os.path.join(folder_path, "README.txt"), "w") as f:
+                f.write(f"Add .msg files to this folder ({folder}) for them to appear in the analyzer.")
+        
         print("Created sample folder structure. Please add .msg files to the subfolders.")
+        return [{"id": folder, "name": folder.replace("_", " ").title(), "count": 0} for folder in sample_folders]
     
     def get_messages_for_process_cached(self, process_id):
         cache_key = f"messages_{process_id}"
@@ -77,10 +87,12 @@ class MSGAnalyzer:
         process_path = os.path.join(self.base_folder, process_id)
         
         if not os.path.exists(process_path):
+            print(f"Process path does not exist: {process_path}")
             return messages
         
         try:
             msg_files = glob.glob(os.path.join(process_path, "*.msg"))
+            print(f"Found {len(msg_files)} .msg files in {process_path}")
             
             for msg_file in msg_files:
                 try:
@@ -96,18 +108,24 @@ class MSGAnalyzer:
                         messages.append(message_data)
                 except Exception as e:
                     print(f"Error parsing {msg_file}: {e}")
+                    traceback.print_exc()
                     continue
             
             messages.sort(key=lambda x: x.get('date', ''), reverse=True)
             
         except Exception as e:
             print(f"Error reading messages for process {process_id}: {e}")
+            traceback.print_exc()
         
         return messages
     
     def _parse_msg_file(self, file_path, process_id):
-        msg = extract_msg.openMsg(file_path)
-        
+        try:
+            msg = extract_msg.Message(file_path)
+        except Exception as e:
+            print(f"Error opening msg file {file_path}: {e}")
+            return None
+            
         try:
             subject = msg.subject or "No Subject"
             sender = msg.sender or "Unknown Sender"
@@ -148,20 +166,30 @@ class MSGAnalyzer:
             
             return message_data
             
+        except Exception as e:
+            print(f"Error parsing message content from {file_path}: {e}")
+            traceback.print_exc()
+            return None
         finally:
-            msg.close()
+            try:
+                msg.close()
+            except:
+                pass
     
     def _parse_recipients(self, msg):
         recipients = []
         
-        if hasattr(msg, 'to') and msg.to:
-            recipients.extend([r.strip() for r in msg.to.split(';')])
-        
-        if hasattr(msg, 'cc') and msg.cc:
-            recipients.extend([r.strip() for r in msg.cc.split(';')])
-        
-        if hasattr(msg, 'bcc') and msg.bcc:
-            recipients.extend([r.strip() for r in msg.bcc.split(';')])
+        try:
+            if hasattr(msg, 'to') and msg.to:
+                recipients.extend([r.strip() for r in msg.to.split(';')])
+            
+            if hasattr(msg, 'cc') and msg.cc:
+                recipients.extend([r.strip() for r in msg.cc.split(';')])
+            
+            if hasattr(msg, 'bcc') and msg.bcc:
+                recipients.extend([r.strip() for r in msg.bcc.split(';')])
+        except:
+            pass
         
         return ', '.join(recipients) if recipients else "No Recipients"
     
@@ -170,9 +198,13 @@ class MSGAnalyzer:
             return datetime.now().isoformat()
         
         try:
-            for fmt in ['%a, %d %b %Y %H:%M:%S %z', '%a, %d %b %Y %H:%M:%S %Z', '%Y-%m-%d %H:%M:%S']:
+            # Remove timezone name for parsing
+            date_str_clean = date_str.split(' (')[0]
+            
+            for fmt in ['%a, %d %b %Y %H:%M:%S %z', '%a, %d %b %Y %H:%M:%S %Z', 
+                       '%Y-%m-%d %H:%M:%S', '%d/%m/%Y %H:%M:%S']:
                 try:
-                    dt = datetime.strptime(date_str, fmt)
+                    dt = datetime.strptime(date_str_clean, fmt)
                     return dt.isoformat()
                 except ValueError:
                     continue
@@ -183,14 +215,17 @@ class MSGAnalyzer:
     def _extract_attachments(self, msg, message_id):
         attachments = []
         
-        if hasattr(msg, 'attachments') and msg.attachments:
-            for i, attachment in enumerate(msg.attachments):
-                if hasattr(attachment, 'longFilename') and attachment.longFilename:
-                    attachments.append({
-                        "name": attachment.longFilename,
-                        "url": f"/api/attachment/{message_id}/{i}",
-                        "type": self._get_attachment_type(attachment.longFilename)
-                    })
+        try:
+            if hasattr(msg, 'attachments') and msg.attachments:
+                for i, attachment in enumerate(msg.attachments):
+                    if hasattr(attachment, 'longFilename') and attachment.longFilename:
+                        attachments.append({
+                            "name": attachment.longFilename,
+                            "url": f"/api/attachment/{message_id}/{i}",
+                            "type": self._get_attachment_type(attachment.longFilename)
+                        })
+        except Exception as e:
+            print(f"Error extracting attachments: {e}")
         
         return attachments
     
@@ -210,10 +245,13 @@ class MSGAnalyzer:
         
         contains_thread = False
         
-        if hasattr(msg, 'body') and msg.body:
-            body_lower = msg.body.lower()
-            thread_indicators = ['original message', 'forwarded message', 'from:', 'sent:', 'to:', 'subject:']
-            contains_thread = any(indicator in body_lower for indicator in thread_indicators)
+        try:
+            if hasattr(msg, 'body') and msg.body:
+                body_lower = msg.body.lower()
+                thread_indicators = ['original message', 'forwarded message', 'from:', 'sent:', 'to:', 'subject:']
+                contains_thread = any(indicator in body_lower for indicator in thread_indicators)
+        except:
+            pass
         
         return {
             "thread_id": thread_id,
@@ -221,31 +259,36 @@ class MSGAnalyzer:
         }
     
     def get_attachment(self, process_id, message_id, attachment_index):
-        original_msg_id = message_id.replace(f"{process_id}_", "")
-        msg_file_path = os.path.join(self.base_folder, process_id, f"{original_msg_id}.msg")
-        
-        if not os.path.exists(msg_file_path):
-            raise FileNotFoundError(f"Message file not found: {msg_file_path}")
-        
-        msg = extract_msg.openMsg(msg_file_path)
         try:
-            if hasattr(msg, 'attachments') and msg.attachments:
-                if 0 <= attachment_index < len(msg.attachments):
-                    attachment = msg.attachments[attachment_index]
-                    
-                    temp_dir = tempfile.mkdtemp()
-                    temp_path = os.path.join(temp_dir, attachment.longFilename)
-                    
-                    with open(temp_path, 'wb') as f:
-                        f.write(attachment.data)
-                    
-                    return temp_path
+            original_msg_id = message_id.replace(f"{process_id}_", "")
+            msg_file_path = os.path.join(self.base_folder, process_id, f"{original_msg_id}.msg")
+            
+            if not os.path.exists(msg_file_path):
+                raise FileNotFoundError(f"Message file not found: {msg_file_path}")
+            
+            msg = extract_msg.Message(msg_file_path)
+            try:
+                if hasattr(msg, 'attachments') and msg.attachments:
+                    if 0 <= attachment_index < len(msg.attachments):
+                        attachment = msg.attachments[attachment_index]
+                        
+                        temp_dir = tempfile.mkdtemp()
+                        temp_path = os.path.join(temp_dir, attachment.longFilename)
+                        
+                        with open(temp_path, 'wb') as f:
+                            f.write(attachment.data)
+                        
+                        return temp_path
+                    else:
+                        raise IndexError(f"Attachment index {attachment_index} out of range")
                 else:
-                    raise IndexError(f"Attachment index {attachment_index} out of range")
-            else:
-                raise ValueError("No attachments found in message")
-        finally:
-            msg.close()
+                    raise ValueError("No attachments found in message")
+            finally:
+                msg.close()
+        except Exception as e:
+            print(f"Error getting attachment: {e}")
+            traceback.print_exc()
+            raise
     
     def update_message_status(self, process_id, message_id, status):
         try:
@@ -299,8 +342,13 @@ class MSGHandler(http.server.SimpleHTTPRequestHandler):
     
     def serve_html(self):
         try:
-            with open('index.html', 'r', encoding='utf-8') as f:
-                html_content = f.read()
+            # Serve index.html for root path
+            if self.path == '/' or self.path == '/index.html':
+                with open('index.html', 'r', encoding='utf-8') as f:
+                    html_content = f.read()
+            else:
+                # For other files, use the default implementation
+                return super().do_GET()
         except FileNotFoundError:
             html_content = """
             <!DOCTYPE html>
@@ -332,10 +380,18 @@ class MSGHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 self.send_error(404, "API endpoint not found")
         except Exception as e:
+            print(f"API error: {e}")
+            traceback.print_exc()
             self.send_error(500, f"Server error: {str(e)}")
     
     def handle_api_post(self):
         try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length > 0:
+                post_data = self.rfile.read(content_length)
+            else:
+                post_data = b'{}'
+                
             if self.path.startswith('/api/message/'):
                 path_parts = self.path.split('/')
                 if len(path_parts) >= 5:
@@ -344,9 +400,9 @@ class MSGHandler(http.server.SimpleHTTPRequestHandler):
                     action = path_parts[5] if len(path_parts) > 5 else None
                     
                     if action == 'status':
-                        self.handle_update_status(process_id, message_id)
+                        self.handle_update_status(process_id, message_id, post_data)
                     elif action == 'comment':
-                        self.handle_add_comment(process_id, message_id)
+                        self.handle_add_comment(process_id, message_id, post_data)
                     else:
                         self.send_error(404, "Action not found")
                 else:
@@ -356,11 +412,17 @@ class MSGHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 self.send_error(404, "API endpoint not found")
         except Exception as e:
+            print(f"API POST error: {e}")
+            traceback.print_exc()
             self.send_error(500, f"Server error: {str(e)}")
     
     def handle_processes(self):
-        processes = analyzer.get_processes()
-        self.send_json_response(processes)
+        try:
+            processes = analyzer.get_processes()
+            self.send_json_response(processes)
+        except Exception as e:
+            print(f"Error in handle_processes: {e}")
+            self.send_error(500, f"Error retrieving processes: {str(e)}")
     
     def handle_messages(self):
         path_parts = self.path.split('/')
@@ -370,8 +432,12 @@ class MSGHandler(http.server.SimpleHTTPRequestHandler):
             self.send_error(400, "Process ID required")
             return
         
-        messages = analyzer.get_messages_for_process_cached(process_id)
-        self.send_json_response(messages)
+        try:
+            messages = analyzer.get_messages_for_process_cached(process_id)
+            self.send_json_response(messages)
+        except Exception as e:
+            print(f"Error in handle_messages: {e}")
+            self.send_error(500, f"Error retrieving messages: {str(e)}")
     
     def handle_attachment(self):
         path_parts = self.path.split('/')
@@ -400,25 +466,28 @@ class MSGHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 
                 with open(attachment_path, 'rb') as f:
-                    self.wfile.write(f.read())
+                    shutil.copyfileobj(f, self.wfile)
                 
                 # Clean up temporary file
                 try:
                     temp_dir = os.path.dirname(attachment_path)
                     if os.path.exists(temp_dir):
                         shutil.rmtree(temp_dir)
-                except:
-                    pass
+                except Exception as e:
+                    print(f"Error cleaning up temp files: {e}")
             else:
                 self.send_error(404, "Attachment not found")
                 
         except Exception as e:
+            print(f"Error handling attachment: {e}")
             self.send_error(500, f"Error retrieving attachment: {str(e)}")
     
-    def handle_update_status(self, process_id, message_id):
-        content_length = int(self.headers['Content-Length'])
-        post_data = self.rfile.read(content_length)
-        data = json.loads(post_data.decode('utf-8'))
+    def handle_update_status(self, process_id, message_id, post_data):
+        try:
+            data = json.loads(post_data.decode('utf-8'))
+        except json.JSONDecodeError:
+            self.send_error(400, "Invalid JSON")
+            return
         
         status = data.get('status')
         if status not in ['keep', 'review', 'untagged']:
@@ -432,14 +501,16 @@ class MSGHandler(http.server.SimpleHTTPRequestHandler):
         else:
             self.send_error(500, "Failed to update status")
     
-    def handle_add_comment(self, process_id, message_id):
-        content_length = int(self.headers['Content-Length'])
-        post_data = self.rfile.read(content_length)
-        data = json.loads(post_data.decode('utf-8'))
+    def handle_add_comment(self, process_id, message_id, post_data):
+        try:
+            data = json.loads(post_data.decode('utf-8'))
+        except json.JSONDecodeError:
+            self.send_error(400, "Invalid JSON")
+            return
         
         # Validate required fields
-        if 'key' not in data or 'labels' not in data:
-            self.send_error(400, "Missing required fields: key and labels")
+        if 'key' not in data:
+            self.send_error(400, "Missing required field: key")
             return
         
         success = analyzer.add_comment_to_message(process_id, message_id, data)
@@ -457,37 +528,76 @@ class MSGHandler(http.server.SimpleHTTPRequestHandler):
         self.send_json_response({"status": "healthy", "timestamp": datetime.now().isoformat()})
     
     def send_json_response(self, data):
-        response_data = json.dumps(data, ensure_ascii=False).encode('utf-8')
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json; charset=utf-8')
-        self.send_header('Content-length', str(len(response_data)))
-        self.end_headers()
-        self.wfile.write(response_data)
+        try:
+            response_data = json.dumps(data, ensure_ascii=False).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json; charset=utf-8')
+            self.send_header('Content-length', str(len(response_data)))
+            self.end_headers()
+            self.wfile.write(response_data)
+        except Exception as e:
+            print(f"Error sending JSON response: {e}")
     
     def log_message(self, format, *args):
-        # Reduce logging noise
-        pass
+        # Print basic logs for debugging
+        print(f"{self.client_address[0]} - {format % args}")
 
 def start_server(port=8000):
+    # Check if index.html exists
     if not os.path.exists('index.html'):
         print("❌ ERROR: index.html not found in current directory!")
         print("Please make sure your HTML file is named 'index.html' and is in the same folder as this script.")
-        return
-    
-    with socketserver.TCPServer(("", port), MSGHandler) as httpd:
-        print(f"🚀 MSG Analyzer démarré sur http://localhost:{port}")
-        print("📁 Dossier des messages:", os.path.abspath("msg_files"))
-        print("🎨 Interface: Template HTML complet")
-        print("⚡ Performance: Cache activé")
-        print("⏹️  Pour arrêter: Ctrl+C")
         
-        print("🌐 Ouverture du navigateur...")
-        webbrowser.open(f'http://localhost:{port}')
-        
+        # Create a basic index.html file
         try:
-            httpd.serve_forever()
-        except KeyboardInterrupt:
-            print("\n🛑 Serveur arrêté")
+            with open('index.html', 'w', encoding='utf-8') as f:
+                f.write("""<!DOCTYPE html>
+<html>
+<head>
+    <title>MSG Analyzer</title>
+    <style>body { font-family: Arial, sans-serif; padding: 20px; }</style>
+</head>
+<body>
+    <h1>MSG Analyzer Backend is Running</h1>
+    <p>The backend server is running, but the main interface file is missing.</p>
+    <p>Please make sure you have the complete HTML file named 'index.html' in the same directory.</p>
+</body>
+</html>""")
+            print("✅ Created a basic index.html file. Please replace it with the full interface.")
+        except Exception as e:
+            print(f"Could not create index.html: {e}")
+    
+    try:
+        with socketserver.TCPServer(("", port), MSGHandler) as httpd:
+            print(f"🚀 MSG Analyzer started on http://localhost:{port}")
+            print("📁 Message folder:", os.path.abspath("msg_files"))
+            print("⚡ Performance: Cache enabled")
+            print("⏹️  To stop: Ctrl+C")
+            
+            print("🌐 Opening browser...")
+            try:
+                webbrowser.open(f'http://localhost:{port}')
+            except:
+                print("⚠️  Could not open browser automatically. Please navigate to the URL above.")
+            
+            try:
+                httpd.serve_forever()
+            except KeyboardInterrupt:
+                print("\n🛑 Server stopped")
+    except OSError as e:
+        if e.errno == 48 or e.errno == 10048:  # Address already in use
+            print(f"❌ Port {port} is already in use!")
+            print(f"💡 Try using a different port: python script.py {port+1}")
+        else:
+            print(f"❌ Error starting server: {e}")
 
 if __name__ == '__main__':
-    start_server()
+    import sys
+    port = 8000
+    if len(sys.argv) > 1:
+        try:
+            port = int(sys.argv[1])
+        except ValueError:
+            print("Invalid port number. Using default port 8000.")
+    
+    start_server(port)
