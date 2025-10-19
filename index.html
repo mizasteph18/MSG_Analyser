@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MSG Analyser</title>
+    <title>MSG Analyser - Optimized</title>
     <style>
         :root {
             --primary-color: #00a678;
@@ -1387,7 +1387,7 @@
 
         .performance-indicator {
             font-size: 0.7rem;
-            color: var(--light-text);
+            color: white;
             margin-left: 10px;
             padding: 2px 6px;
             background: #e8f5e8;
@@ -1641,7 +1641,7 @@
         // API Configuration
         const API_BASE_URL = '/api';
 
-        // Application state - OPTIMIZED VERSION
+        // Application state
         let currentProcess = '';
         let currentMessages = [];
         let filteredMessages = [];
@@ -1660,7 +1660,7 @@
         let isLoadingMore = false;
         let hasMoreMessages = false;
         let totalMessageCount = 0;
-        let loadedMessageIds = new Set(); // Track which messages have full content loaded
+        let loadedMessageIds = new Set();
         
         // DOM Elements
         const processSelect = document.getElementById('process-select');
@@ -1747,19 +1747,15 @@
             });
         });
         
-        // Functions - OPTIMIZED VERSION
-        
+        // Functions
         async function handleProcessChange() {
             currentProcess = processSelect.value;
             if (currentProcess) {
                 try {
                     showLoading(true);
-                    // Reset pagination
                     currentOffset = 0;
-                    currentMessages = [];
-                    loadedMessageIds.clear();
+                    currentLimit = 50;
                     
-                    // Load first batch of messages
                     const response = await fetch(`${API_BASE_URL}/messages/${currentProcess}?limit=${currentLimit}&offset=${currentOffset}`);
                     
                     if (!response.ok) {
@@ -2248,8 +2244,6 @@
             }
         }
         
-        // ... (rest of your functions remain mostly the same, but I'll include key ones)
-        
         function createAttachmentsHeaderHtml(attachments) {
             let html = `
                 <div class="attachments">
@@ -2345,39 +2339,34 @@
             return html;
         }
 
-        // ... (include the rest of your existing functions like displayCurrentConversation, 
-        // showCommentModal, addComment, copyContent, etc. - they should work as-is)
-        
-        // Make sure to include all your existing helper functions like:
-        // formatRecipients, setupRecipientsTooltip, formatDate, formatFullDate, 
-        // formatRelativeTime, toggleCommentExpand, etc.
-
-        // The remaining functions from your original HTML should work without changes
-        // I'm omitting them here for brevity, but you should keep them in your actual file
-
-        // Initialize
-        async function loadProcesses() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/processes`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const processes = await response.json();
-                
-                processSelect.innerHTML = '<option value="">-- Select a folder --</option>';
-                processes.forEach(process => {
-                    const option = document.createElement('option');
-                    option.value = process.id;
-                    option.textContent = `${process.name} (${process.count} messages)`;
-                    processSelect.appendChild(option);
-                });
-            } catch (error) {
-                console.error('Error loading processes:', error);
-                showError('Cannot connect to backend server. Please make sure the Python backend is running on port 8000.');
+        function toggleCommentExpand(commentIndex) {
+            const commentCard = document.querySelector(`[data-comment-index="${commentIndex}"]`);
+            const commentText = commentCard.querySelector('.comment-text-smart');
+            const expandToggle = commentCard.querySelector('.expand-toggle');
+            
+            if (commentCard.classList.contains('expanded')) {
+                commentCard.classList.remove('expanded');
+                commentText.classList.remove('expanded');
+                expandToggle.textContent = 'Show more';
+            } else {
+                commentCard.classList.add('expanded');
+                commentText.classList.add('expanded');
+                expandToggle.textContent = 'Show less';
             }
         }
 
-        // Add these missing helper functions that are referenced but not defined in the shortened version
+        function formatRelativeTime(date) {
+            const now = new Date();
+            const diffInSeconds = Math.floor((now - date) / 1000);
+            
+            if (diffInSeconds < 60) return 'Just now';
+            if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+            if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+            if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+            
+            return formatDate(date);
+        }
+        
         function formatRecipients(recipients) {
             if (!recipients) return "No recipients";
             const recipientsArray = recipients.split(',').map(r => r.trim());
@@ -2436,31 +2425,951 @@
             });
         }
         
-        function formatRelativeTime(date) {
-            const now = new Date();
-            const diffInSeconds = Math.floor((now - date) / 1000);
+        function displayCurrentConversation() {
+            const filteredConversations = currentConversations.filter(conversation => {
+                return conversation.messages.some(message => {
+                    const showKeep = showKeepCheckbox.checked;
+                    const showReview = showReviewCheckbox.checked;
+                    const showUntagged = showUntaggedCheckbox.checked;
+                    
+                    if (message.status === 'keep' && showKeep) return true;
+                    if (message.status === 'review' && showReview) return true;
+                    if (message.status === 'untagged' && showUntagged) return true;
+                    return false;
+                });
+            });
             
-            if (diffInSeconds < 60) return 'Just now';
-            if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-            if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-            if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+            if (filteredConversations.length === 0) {
+                clearConversationDisplay();
+                return;
+            }
             
-            return formatDate(date);
+            const conversation = filteredConversations[currentIndex];
+            const latestMessage = conversation.messages[0];
+            
+            messageSubject.textContent = latestMessage.subject;
+            messageFrom.textContent = latestMessage.from;
+            
+            const formattedRecipients = formatRecipients(latestMessage.to);
+            messageTo.innerHTML = formattedRecipients;
+            
+            setupRecipientsTooltip(messageTo, latestMessage.to);
+            
+            messageDate.textContent = formatFullDate(new Date(latestMessage.date));
+            messageStatus.textContent = getStatusText(latestMessage.status);
+            
+            if (latestMessage.attachments && latestMessage.attachments.length > 0) {
+                const attachmentsHtml = createAttachmentsHeaderHtml(latestMessage.attachments);
+                messageAttachmentsHeader.innerHTML = attachmentsHtml;
+            } else {
+                messageAttachmentsHeader.innerHTML = '';
+            }
+            
+            conversationView.innerHTML = '';
+            
+            conversation.messages.forEach((message, index) => {
+                const messageElement = document.createElement('div');
+                messageElement.className = `conversation-message ${selectedMessageInConversation === message.id ? 'active' : ''}`;
+                messageElement.dataset.messageId = message.id;
+                
+                const statusClass = `status-badge status-${message.status}`;
+                const statusText = getStatusText(message.status);
+                
+                const threadIndicator = message.containsThread ? 
+                    '<span class="thread-indicator">Contains Thread</span>' : '';
+                
+                const formattedRecipients = formatRecipients(message.to);
+                
+                messageElement.innerHTML = `
+                    <div class="message-header-small">
+                        <div class="message-subject-small">
+                            ${message.subject} 
+                            <span class="${statusClass}">${statusText}</span>
+                            ${threadIndicator}
+                            ${index === 0 ? '<span class="latest-indicator">Latest</span>' : ''}
+                        </div>
+                        <div class="message-meta-small">
+                            <div><strong>From:</strong> ${message.from}</div>
+                            <div class="recipients-list"><strong>To:</strong> ${formattedRecipients}</div>
+                            <div><strong>Date:</strong> ${formatFullDate(new Date(message.date))}</div>
+                        </div>
+                        <div class="message-actions-small">
+                            <button class="action-btn-small delete-btn-small tooltip" data-message-id="${message.id}" data-tooltip="Delete">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                                </svg>
+                            </button>
+                            <button class="action-btn-small keep-btn-small tooltip" data-message-id="${message.id}" data-tooltip="Keep">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                </svg>
+                            </button>
+                            <button class="action-btn-small review-btn-small tooltip" data-message-id="${message.id}" data-tooltip="To Review">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                                </svg>
+                            </button>
+                            <button class="action-btn-small comment-btn-small tooltip" data-message-id="${message.id}" data-tooltip="Comment">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                                </svg>
+                            </button>
+                            <button class="action-btn-small copy-btn-small tooltip" data-message-id="${message.id}" data-tooltip="Copy">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                                </svg>
+                            </button>
+                            <button class="action-btn-small outlook-btn-small tooltip" data-message-id="${message.id}" data-tooltip="Download .msg">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                    <polyline points="22,6 12,13 2,6"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="message-body-small">
+                        ${message.comments && message.comments.length > 0 ? createCommentsHtml(message.comments) : ''}
+                        ${message.body_type === 'html' ? 
+                            `<div class="html-body">${message.body}</div>` : 
+                            `<div style="white-space: pre-wrap;">${message.body}</div>`}
+                        ${message.attachments && message.attachments.length > 0 ? createAttachmentsHtml(message.attachments) : ''}
+                    </div>
+                `;
+                
+                const recipientsElement = messageElement.querySelector('.recipients-list');
+                setupRecipientsTooltip(recipientsElement, message.to);
+                
+                const header = messageElement.querySelector('.message-header-small');
+                header.addEventListener('click', (e) => {
+                    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+                    
+                    document.querySelectorAll('.conversation-message').forEach(msg => {
+                        msg.classList.remove('active');
+                    });
+                    messageElement.classList.add('active');
+                    selectedMessageInConversation = message.id;
+                    
+                    messageSubject.textContent = message.subject;
+                    messageFrom.textContent = message.from;
+                    
+                    const formattedRecipients = formatRecipients(message.to);
+                    messageTo.innerHTML = formattedRecipients;
+                    
+                    setupRecipientsTooltip(messageTo, message.to);
+                    
+                    messageDate.textContent = formatFullDate(new Date(message.date));
+                    messageStatus.textContent = getStatusText(message.status);
+                    
+                    if (message.attachments && message.attachments.length > 0) {
+                        const attachmentsHtml = createAttachmentsHeaderHtml(message.attachments);
+                        messageAttachmentsHeader.innerHTML = attachmentsHtml;
+                    } else {
+                        messageAttachmentsHeader.innerHTML = '';
+                    }
+                });
+                
+                const deleteBtnSmall = messageElement.querySelector('.delete-btn-small');
+                const keepBtnSmall = messageElement.querySelector('.keep-btn-small');
+                const reviewBtnSmall = messageElement.querySelector('.review-btn-small');
+                const commentBtnSmall = messageElement.querySelector('.comment-btn-small');
+                const copyBtnSmall = messageElement.querySelector('.copy-btn-small');
+                const outlookBtnSmall = messageElement.querySelector('.outlook-btn-small');
+                
+                deleteBtnSmall.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectedMessageInConversation = message.id;
+                    deleteMode = 'single';
+                    showDeleteModal();
+                });
+                
+                keepBtnSmall.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    markSingleMessageAsKeep(message.id);
+                });
+                
+                reviewBtnSmall.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    markSingleMessageAsReview(message.id);
+                });
+                
+                commentBtnSmall.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectedMessageInConversation = message.id;
+                    showCommentModal();
+                });
+                
+                copyBtnSmall.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    copyMessageContent(message);
+                });
+                
+                outlookBtnSmall.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openMessageInOutlook(message);
+                });
+                
+                conversationView.appendChild(messageElement);
+            });
+            
+            const conversationActions = document.createElement('div');
+            conversationActions.className = 'conversation-actions';
+            conversationActions.innerHTML = `
+                <button class="conversation-action-btn conversation-keep-btn">Keep All Messages</button>
+                <button class="conversation-action-btn conversation-review-btn">Mark All for Review</button>
+                <button class="conversation-action-btn conversation-delete-btn">Delete All Messages</button>
+                <button class="conversation-action-btn conversation-copy-btn">Copy Conversation</button>
+                <button class="conversation-action-btn conversation-outlook-btn tooltip" data-tooltip="Download Latest .msg">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                        <polyline points="22,6 12,13 2,6"/>
+                    </svg>
+                </button>
+            `;
+            
+            conversationActions.querySelector('.conversation-keep-btn').addEventListener('click', () => {
+                markAllMessagesInConversationAsKeep(conversation.threadId);
+            });
+            
+            conversationActions.querySelector('.conversation-review-btn').addEventListener('click', () => {
+                markAllMessagesInConversationAsReview(conversation.threadId);
+            });
+            
+            conversationActions.querySelector('.conversation-delete-btn').addEventListener('click', () => {
+                deleteMode = 'conversation';
+                currentThreadId = conversation.threadId;
+                showDeleteConversationModal();
+            });
+            
+            conversationActions.querySelector('.conversation-copy-btn').addEventListener('click', () => {
+                copyConversationContent(conversation);
+            });
+            
+            conversationActions.querySelector('.conversation-outlook-btn').addEventListener('click', () => {
+                const conversation = filteredConversations[currentIndex];
+                if (conversation && conversation.messages.length > 0) {
+                    openMessageInOutlook(conversation.messages[0]);
+                }
+            });
+            
+            conversationView.appendChild(conversationActions);
+            
+            currentIndexSpan.textContent = currentIndex + 1;
+            totalCountSpan.textContent = filteredConversations.length;
+            
+            prevBtn.disabled = currentIndex === 0;
+            nextBtn.disabled = currentIndex === filteredConversations.length - 1;
+            
+            renderConversationList(filteredConversations);
         }
         
-        function toggleCommentExpand(commentIndex) {
-            const commentCard = document.querySelector(`[data-comment-index="${commentIndex}"]`);
-            const commentText = commentCard.querySelector('.comment-text-smart');
-            const expandToggle = commentCard.querySelector('.expand-toggle');
+        function createAttachmentsHtml(attachments) {
+            let html = `
+                <div class="attachments">
+                    <h4>Attachments</h4>
+                    <div class="attachment-list">
+            `;
             
-            if (commentCard.classList.contains('expanded')) {
-                commentCard.classList.remove('expanded');
-                commentText.classList.remove('expanded');
-                expandToggle.textContent = 'Show more';
+            attachments.forEach(attachment => {
+                const attachmentUrl = `${API_BASE_URL}${attachment.url}`;
+                html += `
+                    <div class="attachment-item">
+                        <span class="attachment-icon">📎</span>
+                        <a href="${attachmentUrl}" class="attachment-link" target="_blank">${attachment.name}</a>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+            `;
+            
+            return html;
+        }
+        
+        function clearMessageDisplay() {
+            messageSubject.textContent = 'Select a message';
+            messageFrom.textContent = '--';
+            messageTo.textContent = '--';
+            messageDate.textContent = '--/--/---- --:--';
+            messageStatus.textContent = '--';
+            messageBody.innerHTML = `
+                <div class="empty-state">
+                    <h3>No message selected</h3>
+                    <p>Select a process in the left panel, then click on a message to display its content.</p>
+                </div>
+            `;
+            messageComments.innerHTML = '';
+            messageAttachmentsHeader.innerHTML = '';
+            
+            currentIndexSpan.textContent = '0';
+            totalCountSpan.textContent = '0';
+            
+            prevBtn.disabled = true;
+            nextBtn.disabled = true;
+        }
+        
+        function clearConversationDisplay() {
+            messageSubject.textContent = 'Select a conversation';
+            messageFrom.textContent = '--';
+            messageTo.textContent = '--';
+            messageDate.textContent = '--/--/---- --:--';
+            messageStatus.textContent = '--';
+            conversationView.innerHTML = `
+                <div class="empty-state">
+                    <h3>No conversation selected</h3>
+                    <p>Select a conversation in the left panel to view the entire thread.</p>
+                </div>
+            `;
+            messageComments.innerHTML = '';
+            messageAttachmentsHeader.innerHTML = '';
+            
+            currentIndexSpan.textContent = '0';
+            totalCountSpan.textContent = '0';
+            
+            prevBtn.disabled = true;
+            nextBtn.disabled = true;
+        }
+        
+        function showPrevious() {
+            if (currentView === 'single') {
+                if (currentIndex > 0) {
+                    currentIndex--;
+                    displayCurrentMessage();
+                }
             } else {
-                commentCard.classList.add('expanded');
-                commentText.classList.add('expanded');
-                expandToggle.textContent = 'Show less';
+                const filteredConversations = currentConversations.filter(conversation => {
+                    return conversation.messages.some(message => {
+                        const showKeep = showKeepCheckbox.checked;
+                        const showReview = showReviewCheckbox.checked;
+                        const showUntagged = showUntaggedCheckbox.checked;
+                        
+                        if (message.status === 'keep' && showKeep) return true;
+                        if (message.status === 'review' && showReview) return true;
+                        if (message.status === 'untagged' && showUntagged) return true;
+                        return false;
+                    });
+                });
+                
+                if (currentIndex > 0) {
+                    currentIndex--;
+                    selectedMessageInConversation = null;
+                    displayCurrentConversation();
+                }
+            }
+        }
+        
+        function showNext() {
+            if (currentView === 'single') {
+                if (currentIndex < filteredMessages.length - 1) {
+                    currentIndex++;
+                    displayCurrentMessage();
+                }
+            } else {
+                const filteredConversations = currentConversations.filter(conversation => {
+                    return conversation.messages.some(message => {
+                        const showKeep = showKeepCheckbox.checked;
+                        const showReview = showReviewCheckbox.checked;
+                        const showUntagged = showUntaggedCheckbox.checked;
+                        
+                        if (message.status === 'keep' && showKeep) return true;
+                        if (message.status === 'review' && showReview) return true;
+                        if (message.status === 'untagged' && showUntagged) return true;
+                        return false;
+                    });
+                });
+                
+                if (currentIndex < filteredConversations.length - 1) {
+                    currentIndex++;
+                    selectedMessageInConversation = null;
+                    displayCurrentConversation();
+                }
+            }
+        }
+        
+        function showDeleteModal() {
+            if (currentView === 'conversation' && !selectedMessageInConversation) {
+                alert('Please select a message in the conversation first');
+                return;
+            }
+            deleteModal.style.display = 'flex';
+        }
+        
+        function hideDeleteModal() {
+            deleteModal.style.display = 'none';
+        }
+        
+        function showDeleteConversationModal() {
+            deleteConversationModal.style.display = 'flex';
+        }
+        
+        function hideDeleteConversationModal() {
+            deleteConversationModal.style.display = 'none';
+        }
+        
+        function openInOutlook() {
+            if (currentView === 'single') {
+                if (filteredMessages.length === 0) return;
+                
+                const message = filteredMessages[currentIndex];
+                openMessageInOutlook(message);
+            } else {
+                const filteredConversations = currentConversations.filter(conversation => {
+                    return conversation.messages.some(message => {
+                        const showKeep = showKeepCheckbox.checked;
+                        const showReview = showReviewCheckbox.checked;
+                        const showUntagged = showUntaggedCheckbox.checked;
+                        
+                        if (message.status === 'keep' && showKeep) return true;
+                        if (message.status === 'review' && showReview) return true;
+                        if (message.status === 'untagged' && showUntagged) return true;
+                        return false;
+                    });
+                });
+                
+                if (filteredConversations.length === 0) return;
+                
+                const conversation = filteredConversations[currentIndex];
+                let messageToOpen;
+                
+                if (selectedMessageInConversation) {
+                    messageToOpen = conversation.messages.find(msg => msg.id === selectedMessageInConversation);
+                } else {
+                    messageToOpen = conversation.messages[0];
+                }
+                
+                if (messageToOpen) {
+                    openMessageInOutlook(messageToOpen);
+                }
+            }
+        }
+
+        function openMessageInOutlook(message) {
+            // Create download link for .msg file
+            const downloadUrl = `${API_BASE_URL}/attachment/${currentProcess}/${message.id}/0`;
+            
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = message.filename || 'message.msg';
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showCopyIndicator('Downloading .msg file...');
+        }
+        
+        function showCommentModal() {
+            if (currentView === 'conversation' && !selectedMessageInConversation) {
+                alert('Please select a message in the conversation first');
+                return;
+            }
+            
+            currentLabels = [];
+            commentKeyIds.innerHTML = '<option value="">-- Select a Key ID --</option>';
+            commentKeyLabel.value = '';
+            commentLabels.value = '';
+            commentText.value = '';
+            updateLabelsDisplay();
+            
+            clearValidationErrors();
+            
+            loadKeyIdsFromCSV();
+            
+            commentModal.style.display = 'flex';
+            
+            setTimeout(() => {
+                commentKeyIds.focus();
+            }, 100);
+        }
+
+        function loadKeyIdsFromCSV() {
+            const simulatedCSV = `ID1,ID2,ID3,ID4,ID5,ID6,ID7,ID8,ID9,ID10
+PROJ001,PROJ002,PROJ003,PROJ004,PROJ005
+DOC001,DOC002,DOC003,DOC004
+USER001,USER002,USER003`;
+            
+            const lines = simulatedCSV.split('\n');
+            validKeyIds = [];
+            
+            lines.forEach(line => {
+                const ids = line.split(',').map(id => id.trim()).filter(id => id);
+                validKeyIds.push(...ids);
+            });
+            
+            validKeyIds = [...new Set(validKeyIds)];
+            
+            validKeyIds.forEach(keyId => {
+                const option = document.createElement('option');
+                option.value = keyId;
+                option.textContent = keyId;
+                commentKeyIds.appendChild(option);
+            });
+            
+            updateKeyIdPreview();
+        }
+
+        function validateCommentForm() {
+            let isValid = true;
+            
+            const keyId = commentKeyIds.value.trim();
+            if (!keyId) {
+                document.getElementById('key-id-group').classList.add('error');
+                isValid = false;
+            } else {
+                document.getElementById('key-id-group').classList.remove('error');
+            }
+            
+            const keyLabel = commentKeyLabel.value.trim();
+            if (!keyLabel) {
+                document.getElementById('key-label-group').classList.add('error');
+                isValid = false;
+            } else {
+                document.getElementById('key-label-group').classList.remove('error');
+            }
+            
+            return isValid;
+        }
+
+        function clearValidationErrors() {
+            document.getElementById('key-id-group').classList.remove('error');
+            document.getElementById('key-label-group').classList.remove('error');
+        }
+
+        function hideCommentModal() {
+            commentModal.style.display = 'none';
+        }
+        
+        function updateKeyIdPreview() {
+            const selectedId = commentKeyIds.value;
+            
+            if (selectedId) {
+                keyIdPreview.textContent = `Selected: ${selectedId}`;
+            } else {
+                keyIdPreview.textContent = 'No ID selected';
+            }
+        }
+        
+        function updateLabelPreview() {
+            const labelValue = commentKeyLabel.value;
+            const transformedLabel = transformLabel(labelValue);
+            
+            if (labelValue) {
+                labelPreview.textContent = `Will be saved as: ${transformedLabel}`;
+            } else {
+                labelPreview.textContent = 'Enter a label to see transformation';
+            }
+        }
+        
+        function transformLabel(label) {
+            return label.toUpperCase().replace(/[^A-Z0-9_]/g, '');
+        }
+        
+        function addLabel() {
+            const labelText = commentLabels.value.trim();
+            if (labelText) {
+                const labels = labelText.split(',').map(l => l.trim()).filter(l => l);
+                currentLabels.push(...labels);
+                commentLabels.value = '';
+                updateLabelsDisplay();
+            }
+        }
+        
+        function updateLabelsDisplay() {
+            labelsDisplay.innerHTML = '';
+            currentLabels.forEach((label, index) => {
+                const labelTag = document.createElement('div');
+                labelTag.className = 'label-tag';
+                labelTag.innerHTML = `
+                    ${label}
+                    <button class="remove-label" data-index="${index}">×</button>
+                `;
+                labelsDisplay.appendChild(labelTag);
+            });
+            
+            document.querySelectorAll('.remove-label').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const index = parseInt(e.target.dataset.index);
+                    currentLabels.splice(index, 1);
+                    updateLabelsDisplay();
+                });
+            });
+        }
+        
+        async function addComment() {
+            if (!validateCommentForm()) {
+                showError('Please fill in all mandatory fields');
+                return;
+            }
+
+            const commentTextValue = commentText.value.trim();
+            const keyId = commentKeyIds.value.trim();
+            const keyLabelValue = commentKeyLabel.value.trim();
+            
+            const transformedLabel = transformLabel(keyLabelValue);
+            
+            let messageSubject = '';
+            let messageDate = '';
+            
+            if (currentView === 'single') {
+                if (filteredMessages.length > 0) {
+                    const currentMessage = filteredMessages[currentIndex];
+                    messageSubject = currentMessage.subject;
+                    messageDate = currentMessage.date;
+                }
+            } else {
+                if (selectedMessageInConversation) {
+                    const message = currentMessages.find(m => m.id === selectedMessageInConversation);
+                    if (message) {
+                        messageSubject = message.subject;
+                        messageDate = message.date;
+                    }
+                }
+            }
+            
+            const comment = {
+                key: {
+                    ids: [keyId],
+                    label: transformedLabel
+                },
+                labels: [...currentLabels],
+                text: commentTextValue,
+                date: new Date().toISOString(),
+                message_subject: messageSubject,
+                message_date: messageDate
+            };
+            
+            try {
+                const messageId = currentView === 'single' ? 
+                    filteredMessages[currentIndex].id : selectedMessageInConversation;
+                
+                const response = await fetch(`${API_BASE_URL}/message/${currentProcess}/${messageId}/comment`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(comment)
+                });
+                
+                if (response.ok) {
+                    if (currentView === 'single') {
+                        const message = filteredMessages[currentIndex];
+                        if (!message.comments) message.comments = [];
+                        message.comments.push(comment);
+                        displayCurrentMessage();
+                    } else {
+                        if (selectedMessageInConversation) {
+                            const message = currentMessages.find(m => m.id === selectedMessageInConversation);
+                            if (!message.comments) message.comments = [];
+                            message.comments.push(comment);
+                            displayCurrentConversation();
+                        }
+                    }
+                    
+                    currentLabels = [];
+                    commentKeyIds.value = '';
+                    commentKeyLabel.value = '';
+                    commentLabels.value = '';
+                    commentText.value = '';
+                    updateLabelsDisplay();
+                    updateKeyIdPreview();
+                    updateLabelPreview();
+                    clearValidationErrors();
+                    
+                    console.log('Comment added successfully');
+                    hideCommentModal();
+                } else {
+                    throw new Error('Failed to add comment');
+                }
+            } catch (error) {
+                console.error('Error adding comment:', error);
+                alert('Error adding comment. Please try again.');
+            }
+        }
+        
+        function copyContent() {
+            if (currentView === 'single') {
+                if (filteredMessages.length === 0) return;
+                
+                const message = filteredMessages[currentIndex];
+                copyMessageContent(message);
+            } else {
+                const filteredConversations = currentConversations.filter(conversation => {
+                    return conversation.messages.some(message => {
+                        const showKeep = showKeepCheckbox.checked;
+                        const showReview = showReviewCheckbox.checked;
+                        const showUntagged = showUntaggedCheckbox.checked;
+                        
+                        if (message.status === 'keep' && showKeep) return true;
+                        if (message.status === 'review' && showReview) return true;
+                        if (message.status === 'untagged' && showUntagged) return true;
+                        return false;
+                    });
+                });
+                
+                if (filteredConversations.length === 0) return;
+                
+                const conversation = filteredConversations[currentIndex];
+                copyConversationContent(conversation);
+            }
+        }
+        
+        function copyMessageContent(message) {
+            let textToCopy = `Subject: ${message.subject}\n`;
+            textToCopy += `From: ${message.from}\n`;
+            textToCopy += `To: ${message.to}\n`;
+            textToCopy += `Date: ${formatFullDate(new Date(message.date))}\n\n`;
+            
+            // Strip HTML tags for plain text copy
+            const plainTextBody = message.body.replace(/<[^>]*>/g, '');
+            textToCopy += `Body:\n${plainTextBody}\n\n`;
+            
+            if (message.attachments && message.attachments.length > 0) {
+                textToCopy += `Attachments:\n`;
+                message.attachments.forEach(attachment => {
+                    textToCopy += `- ${attachment.name}\n`;
+                });
+                textToCopy += `\n`;
+            }
+            
+            if (message.comments && message.comments.length > 0) {
+                textToCopy += `Comments:\n`;
+                message.comments.forEach(comment => {
+                    const keyTitle = comment.key ? `${comment.key.ids.join(', ')} - ${comment.key.label}` : '';
+                    textToCopy += `- ${keyTitle}: ${comment.text}\n`;
+                });
+            }
+            
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showCopyIndicator();
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+            });
+        }
+        
+        function copyConversationContent(conversation) {
+            let textToCopy = `Conversation: ${conversation.subject}\n\n`;
+            
+            conversation.messages.forEach((message, index) => {
+                textToCopy += `Message ${index + 1}:\n`;
+                textToCopy += `Subject: ${message.subject}\n`;
+                textToCopy += `From: ${message.from}\n`;
+                textToCopy += `To: ${message.to}\n`;
+                textToCopy += `Date: ${formatFullDate(new Date(message.date))}\n\n`;
+                
+                const plainTextBody = message.body.replace(/<[^>]*>/g, '');
+                textToCopy += `Body:\n${plainTextBody}\n\n`;
+                
+                if (message.attachments && message.attachments.length > 0) {
+                    textToCopy += `Attachments:\n`;
+                    message.attachments.forEach(attachment => {
+                        textToCopy += `- ${attachment.name}\n`;
+                    });
+                    textToCopy += `\n`;
+                }
+                
+                if (message.comments && message.comments.length > 0) {
+                    textToCopy += `Comments:\n`;
+                    message.comments.forEach(comment => {
+                        const keyTitle = comment.key ? `${comment.key.ids.join(', ')} - ${comment.key.label}` : '';
+                        textToCopy += `- ${keyTitle}: ${comment.text}\n`;
+                    });
+                    textToCopy += `\n`;
+                }
+                
+                textToCopy += `---\n\n`;
+            });
+            
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showCopyIndicator();
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+            });
+        }
+        
+        function showCopyIndicator(message = 'Copied to clipboard!') {
+            copyIndicator.textContent = message;
+            copyIndicator.classList.add('show');
+            
+            const timeout = message.length > 50 ? 4000 : 2000;
+            
+            setTimeout(() => {
+                copyIndicator.classList.remove('show');
+            }, timeout);
+        }
+        
+        function deleteCurrentMessage() {
+            if (deleteMode === 'single') {
+                if (currentView === 'single') {
+                    if (filteredMessages.length === 0) return;
+                    
+                    const messageId = filteredMessages[currentIndex].id;
+                    deleteMessageById(messageId);
+                } else {
+                    if (selectedMessageInConversation) {
+                        deleteMessageById(selectedMessageInConversation);
+                    }
+                }
+                hideDeleteModal();
+            } else if (deleteMode === 'conversation') {
+                if (currentThreadId) {
+                    deleteConversationById(currentThreadId);
+                }
+                hideDeleteConversationModal();
+            }
+        }
+        
+        function deleteCurrentConversation() {
+            if (currentThreadId) {
+                deleteConversationById(currentThreadId);
+            }
+            hideDeleteConversationModal();
+        }
+        
+        function deleteMessageById(messageId) {
+            const messageIndex = currentMessages.findIndex(msg => msg.id === messageId);
+            if (messageIndex !== -1) {
+                currentMessages.splice(messageIndex, 1);
+                applyFilters();
+                console.log(`Message ${messageId} deleted`);
+            } else {
+                console.error(`Message ${messageId} not found`);
+            }
+        }
+        
+        function deleteConversationById(threadId) {
+            const messagesToDelete = currentMessages.filter(msg => msg.threadId === threadId);
+            
+            messagesToDelete.forEach(message => {
+                const messageIndex = currentMessages.findIndex(msg => msg.id === message.id);
+                if (messageIndex !== -1) {
+                    currentMessages.splice(messageIndex, 1);
+                    console.log(`Message ${message.id} deleted`);
+                }
+            });
+            
+            const conversationIndex = currentConversations.findIndex(conv => conv.threadId === threadId);
+            if (conversationIndex !== -1) {
+                currentConversations.splice(conversationIndex, 1);
+            }
+            
+            applyFilters();
+            console.log(`All messages in conversation ${threadId} deleted`);
+        }
+        
+        async function markAsKeep() {
+            if (currentView === 'single') {
+                if (filteredMessages.length === 0) return;
+                
+                const messageId = filteredMessages[currentIndex].id;
+                await markSingleMessageAsKeep(messageId);
+            } else {
+                if (selectedMessageInConversation) {
+                    await markSingleMessageAsKeep(selectedMessageInConversation);
+                }
+            }
+        }
+        
+        async function markSingleMessageAsKeep(messageId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/message/${currentProcess}/${messageId}/status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status: 'keep' })
+                });
+                
+                if (response.ok) {
+                    const message = currentMessages.find(msg => msg.id === messageId);
+                    
+                    if (message) {
+                        message.status = 'keep';
+                        
+                        if (currentView === 'single') {
+                            displayCurrentMessage();
+                        } else {
+                            displayCurrentConversation();
+                        }
+                        
+                        console.log(`Message ${messageId} marked as "Keep"`);
+                    }
+                } else {
+                    throw new Error('Failed to update status');
+                }
+            } catch (error) {
+                console.error('Error updating status:', error);
+                alert('Error updating message status');
+            }
+        }
+        
+        function markAllMessagesInConversationAsKeep(threadId) {
+            const conversation = currentConversations.find(conv => conv.threadId === threadId);
+            
+            if (conversation) {
+                conversation.messages.forEach(message => {
+                    markSingleMessageAsKeep(message.id);
+                });
+                
+                console.log(`All messages in conversation marked as "Keep"`);
+            }
+        }
+        
+        async function markAsReview() {
+            if (currentView === 'single') {
+                if (filteredMessages.length === 0) return;
+                
+                const messageId = filteredMessages[currentIndex].id;
+                await markSingleMessageAsReview(messageId);
+            } else {
+                if (selectedMessageInConversation) {
+                    await markSingleMessageAsReview(selectedMessageInConversation);
+                }
+            }
+        }
+        
+        async function markSingleMessageAsReview(messageId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/message/${currentProcess}/${messageId}/status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status: 'review' })
+                });
+                
+                if (response.ok) {
+                    const message = currentMessages.find(msg => msg.id === messageId);
+                    
+                    if (message) {
+                        message.status = 'review';
+                        
+                        if (currentView === 'single') {
+                            displayCurrentMessage();
+                        } else {
+                            displayCurrentConversation();
+                        }
+                        
+                        console.log(`Message ${messageId} marked as "To Review"`);
+                    }
+                } else {
+                    throw new Error('Failed to update status');
+                }
+            } catch (error) {
+                console.error('Error updating status:', error);
+                alert('Error updating message status');
+            }
+        }
+        
+        function markAllMessagesInConversationAsReview(threadId) {
+            const conversation = currentConversations.find(conv => conv.threadId === threadId);
+            
+            if (conversation) {
+                conversation.messages.forEach(message => {
+                    markSingleMessageAsReview(message.id);
+                });
+                
+                console.log(`All messages in conversation marked as "To Review"`);
             }
         }
         
@@ -2471,13 +3380,46 @@
                 default: return 'Untagged';
             }
         }
+        
+        async function loadProcesses() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/processes`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const processes = await response.json();
+                
+                processSelect.innerHTML = '<option value="">-- Select a folder --</option>';
+                processes.forEach(process => {
+                    const option = document.createElement('option');
+                    option.value = process.id;
+                    option.textContent = `${process.name} (${process.count} messages)`;
+                    processSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading processes:', error);
+                showError('Cannot connect to backend server. Please make sure the Python backend is running on port 8000.');
+            }
+        }
 
-        // Initialize the app
+        commentKeyIds.addEventListener('change', function() {
+            if (this.value.trim()) {
+                document.getElementById('key-id-group').classList.remove('error');
+            }
+            updateKeyIdPreview();
+        });
+
+        commentKeyLabel.addEventListener('input', function() {
+            if (this.value.trim()) {
+                document.getElementById('key-label-group').classList.remove('error');
+            }
+            updateLabelPreview();
+        });
+        
         document.addEventListener('DOMContentLoaded', function() {
             loadProcesses();
             clearMessageDisplay();
         });
-
     </script>
 </body>
 </html>
